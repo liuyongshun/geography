@@ -2,9 +2,17 @@
 import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import SideNav from './SideNav.vue'
+import ResourcesEntry from './ResourcesEntry.vue'
 
 const route = useRoute()
-const crumb = computed(() => (route.name === 'tutorial' ? '教程详情' : '课程目录'))
+const crumb = computed(() => {
+  if (route.name === 'resources') return '开源资源'
+  if (route.name === 'demo') return '图形演示'
+  if (route.name === 'lab') return '地球预览'
+  if (route.name === 'tutorial') return '教程说明'
+  return '课程目录'
+})
+const fillPane = computed(() => route.name === 'demo' || route.name === 'lab')
 </script>
 
 <template>
@@ -17,8 +25,11 @@ const crumb = computed(() => (route.name === 'tutorial' ? '教程详情' : '课�
         <span>湘教版（2019）同步教程</span>
         <span class="sep">/</span>
         <span class="crumb">{{ crumb }}</span>
+        <div class="bar-entry">
+          <ResourcesEntry />
+        </div>
       </header>
-      <div class="body">
+      <div class="body" :class="{ fill: fillPane }">
         <RouterView />
       </div>
     </div>
@@ -59,9 +70,15 @@ const crumb = computed(() => (route.name === 'tutorial' ? '教程详情' : '课�
 .crumb {
   color: var(--text-700);
 }
+.bar-entry {
+  margin-left: auto;
+}
 .body {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+.body.fill {
+  overflow: hidden;
 }
 </style>

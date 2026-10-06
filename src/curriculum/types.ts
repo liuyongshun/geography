@@ -54,6 +54,20 @@ export interface TutorialRef {
   section: Section
 }
 
+export function firstTutorialInGrade(curriculum: Curriculum, gradeId: string): TutorialRef | null {
+  const grade = curriculum.grades.find((g) => g.id === gradeId)
+  if (!grade) return null
+  for (const book of grade.books) {
+    for (const chapter of book.chapters) {
+      for (const section of chapter.sections) {
+        const tutorial = section.tutorials[0]
+        if (tutorial) return { tutorial, grade, book, chapter, section }
+      }
+    }
+  }
+  return null
+}
+
 export function findTutorial(curriculum: Curriculum, tutorialId: string): TutorialRef | null {
   for (const grade of curriculum.grades) {
     for (const book of grade.books) {

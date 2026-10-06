@@ -115,14 +115,12 @@ function previewOnGlobe() {
         >
           地球预览
         </el-button>
-        <el-button size="large" @click="router.push({ name: 'home' })">返回课程目录</el-button>
       </div>
     </section>
   </div>
   <div v-else class="page empty">
     <h1>未找到教程</h1>
     <p>请从左侧导航选择年级与章节。</p>
-    <el-button type="primary" @click="router.push({ name: 'home' })">回到目录</el-button>
   </div>
 </template>
 

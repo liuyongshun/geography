@@ -40,7 +40,6 @@ function goGlobe() {
 <template>
   <div class="demo-lab">
     <header class="top">
-      <el-button text @click="router.push({ name: 'home' })">← 课程目录</el-button>
       <div class="titles" v-if="hit && demo">
         <h1>{{ demo.title }}</h1>
         <p class="path">
@@ -90,7 +89,7 @@ function goGlobe() {
 
     <div v-else class="missing">
       <p>未登记演示：{{ tutorialId }}</p>
-      <el-button type="primary" @click="router.push({ name: 'home' })">回目录</el-button>
+      <p>请从左侧目录选择课时。</p>
     </div>
   </div>
 </template>
@@ -100,7 +99,6 @@ function goGlobe() {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 100vh;
   background: var(--bg-app);
 }
 .top {
@@ -132,18 +130,18 @@ function goGlobe() {
 .body {
   flex: 1;
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 100px 1fr;
   min-height: 0;
 }
 .side {
   border-right: 1px solid var(--border);
   background: var(--bg-surface);
-  padding: 12px 10px;
+  padding: 8px 4px;
   overflow: auto;
 }
 .side-label {
-  margin: 0 8px 8px;
-  font-size: 11px;
+  margin: 0 4px 6px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-400);
@@ -158,9 +156,10 @@ function goGlobe() {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-500);
-  font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 6px 6px;
+  border-radius: 6px;
   cursor: pointer;
 }
 .step:hover {

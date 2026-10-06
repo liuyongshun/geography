@@ -132,6 +132,8 @@ npm run tauri dev
 | 图标 | `@meteocons/svg` 或自绘 | 勿抓未授权网图 |
 | 禁止默认 | 无授权商用贴图、未标注版权的网图爬取 | — |
 
+**应用内索引：** 顶栏「开源资源」或 `#/resources`；数据文件 `content/resources/open-geo.json`。**国外资源必须带 `foreign: true`**，界面用金色「国外」角标。增删条目时同步改该 JSON 与下表精神一致。
+
 **原则：能用自绘 / 粒子 / 滤镜讲清的，不必堆贴图；需要真实质感时，优先 CC0 / 公有领域，并离线打包。**
 
 ---
@@ -144,7 +146,7 @@ src/curriculum/          目录查询、demoRegistry、layerBindings
 src/engine/globe/        GlobeHost + layers/*（可插拔）
 src/demos/<id>/          DemoLab 各课画布
 src/demos/theme.ts       DemoHex / Demo3 统一色板
-src/views/Course|GeoLab|DemoLab|layout/
+src/views/Course|GeoLab|DemoLab|Resources|layout/
 src/stores/              场景状态
 public/geo|textures/     教学数据与贴图
 src-tauri/               桌面壳
@@ -153,6 +155,7 @@ src-tauri/               桌面壳
 - 地球能力 → **图层**，禁止往 `GlobeHost` 堆业务几何（见 `globe-layers.mdc`）。
 - 课与图层 → **绑定表**，禁止页面里硬编码一长串 `layers.xxx = true`。
 - Demo 主题 → `theme.ts` + CSS `--demo-*`，禁止示意层散落硬编码色。
+- 布局：**左侧 `SideNav` 课程目录常驻**，右侧 `RouterView` 换内容（资源 / 教程说明 / DemoLab / GeoLab）。演示课与地球预览必须挂在 `AppShell` 子路由，禁止独立全屏页把目录卸掉。
 
 ---
 
@@ -162,7 +165,7 @@ src-tauri/               桌面壳
 2. `src/curriculum/demoRegistry.ts` 登记：`tutorialId`、`engine`、`steps`、`status`、`load`。
 3. `status: 'ready'` → 实现 `src/demos/<id>/index.vue`。
 4. `status: 'deferred'` → 走 `DemoPlaceholder`。
-5. 路由：`/demo/:tutorialId`。
+5. 路由：`#/demo/:tutorialId`（`AppShell` 子路由，左侧目录不卸）。
 
 ### 引擎选择
 

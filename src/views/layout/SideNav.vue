@@ -2,19 +2,20 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import curriculumJson from '@content/curriculum/xiangjiao.json'
-import { findTutorial, type Curriculum, type Tutorial } from '@/curriculum/types'
+import { findTutorial, firstTutorialInGrade, type Curriculum, type Tutorial } from '@/curriculum/types'
 import { getDemo } from '@/curriculum/demoRegistry'
 
 const curriculum = curriculumJson as Curriculum
 const route = useRoute()
 const router = useRouter()
 
-const activeGradeId = ref(curriculum.grades[1]?.id ?? curriculum.grades[0].id)
-const openBooks = ref<string[]>(['xx1'])
+const activeGradeId = ref<string | null>(curriculum.grades[0]?.id ?? null)
+const openBooks = ref<string[]>([])
 
-const activeGrade = computed(
-  () => curriculum.grades.find((g) => g.id === activeGradeId.value) ?? curriculum.grades[0],
-)
+const activeGrade = computed(() => {
+  const id = activeGradeId.value
+  return curriculum.grades.find((g) => g.id === id) ?? curriculum.grades[0]
+})
 
 const currentTutorialId = computed(() => {
   const id = route.params.tutorialId
@@ -31,25 +32,22 @@ watch(
   () => route.params.tutorialId,
   (id) => {
     if (typeof id !== 'string') return
-    for (const grade of curriculum.grades) {
-      for (const book of grade.books) {
-        for (const chapter of book.chapters) {
-          for (const section of chapter.sections) {
-            if (section.tutorials.some((t) => t.id === id)) {
-              activeGradeId.value = grade.id
-              if (!openBooks.value.includes(book.id)) openBooks.value = [...openBooks.value, book.id]
-              return
-            }
-          }
-        }
-      }
-    }
+    const hit = findTutorial(curriculum, id)
+    if (!hit) return
+    activeGradeId.value = hit.grade.id
+    if (!openBooks.value.includes(hit.book.id)) openBooks.value = [...openBooks.value, hit.book.id]
   },
   { immediate: true },
 )
 
 function selectGrade(id: string) {
   activeGradeId.value = id
+  const hit = firstTutorialInGrade(curriculum, id)
+  if (!hit) return
+  if (!openBooks.value.includes(hit.book.id)) {
+    openBooks.value = [...openBooks.value, hit.book.id]
+  }
+  openTutorial(hit.tutorial.id)
 }
 
 function toggleBook(id: string) {
@@ -141,7 +139,6 @@ function bookStats(bookId: string) {
               >
                 <span class="dot" />
                 <span class="name">{{ t.title }}</span>
-                <span class="tag">{{ isTutorialReady(t) ? '可学' : '筹备' }}</span>
               </button>
             </div>
           </div>
@@ -153,17 +150,17 @@ function bookStats(bookId: string) {
 
 <style scoped>
 .nav {
-  width: 292px;
+  width: 236px;
   flex-shrink: 0;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 .brand {
-  padding: 14px 14px 10px;
+  padding: 10px 10px 8px;
   border-bottom: 1px solid var(--border);
 }
 .edition {
@@ -185,16 +182,16 @@ function bookStats(bookId: string) {
 .grades {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding: 10px 12px 0;
+  gap: 4px;
+  padding: 8px 8px 0;
 }
 .grade {
   border: 1px solid var(--border);
   background: var(--bg-subtle);
   color: var(--text-700);
   border-radius: 8px;
-  padding: 8px 0;
-  font-size: 13px;
+  padding: 6px 0;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -205,14 +202,16 @@ function bookStats(bookId: string) {
   box-shadow: var(--glow-teal);
 }
 .grade-sum {
-  margin: 8px 12px 4px;
+  margin: 6px 8px 2px;
   font-size: 11px;
   line-height: 1.5;
   color: var(--text-400);
 }
 .books {
-  padding: 6px 8px 16px;
+  padding: 4px 6px 12px;
   flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .book {
   margin-bottom: 8px;
@@ -231,7 +230,7 @@ function bookStats(bookId: string) {
   border: 0;
   background: transparent;
   color: var(--text-900);
-  padding: 10px 10px 4px;
+  padding: 8px 8px 2px;
   cursor: pointer;
 }
 .book-hd strong {
@@ -288,14 +287,14 @@ function bookStats(bookId: string) {
 .tut {
   width: 100%;
   display: grid;
-  grid-template-columns: 10px 1fr auto;
-  gap: 8px;
+  grid-template-columns: 8px 1fr;
+  gap: 6px;
   align-items: center;
   border: 0;
   background: transparent;
   color: var(--text-700);
   text-align: left;
-  padding: 7px 8px;
+  padding: 6px 6px;
   border-radius: 8px;
   cursor: pointer;
   margin-bottom: 2px;
@@ -320,12 +319,5 @@ function bookStats(bookId: string) {
 .name {
   font-size: 12px;
   line-height: 1.35;
-}
-.tag {
-  font-size: 10px;
-  color: var(--text-400);
-}
-.tut.ready .tag {
-  color: var(--primary);
 }
 </style>

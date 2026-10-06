@@ -44,7 +44,6 @@ onUnmounted(() => {
 <template>
   <div class="geo-lab">
     <header class="top">
-      <el-button text @click="router.push({ name: 'home' })">← 课程目录</el-button>
       <div class="titles">
         <h1>
           {{ courseHit?.tutorial.title ?? store.pack.title }}
@@ -94,7 +93,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 100vh;
   background: var(--bg-app);
 }
 .top {

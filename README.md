@@ -14,8 +14,8 @@
 
 ```bash
 npm install
-npm run dev          # http://localhost:1430 → 首页即湘教版目录布局
-                     # #/t/... 教程详情  #/lab/... 实验  #/demo/... 演示课
+npm run dev          # http://localhost:1430 → 左目录右内容；默认 #/resources
+                     # #/t/... 教程说明  #/lab/... 地球预览  #/demo/... 演示课
 npm run tauri dev    # 桌面
 npm run tauri build  # 安装包 dmg / nsis / msi
 ```

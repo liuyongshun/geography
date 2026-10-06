@@ -1,0 +1,297 @@
+{
+  "title": "开源地理资源索引",
+  "lead": "课堂之外，可去这些公开站点继续学影像、地形、气候与地图。链接为原文入口，许可以各站为准；课堂示意仍以本应用内离线打包资源为准。",
+  "disclaimer": "本表仅作学习导航，不构成教材或主权划界依据。国外站点已单独标注，访问可能需科学网络环境。",
+  "categories": [
+    {
+      "id": "in-app",
+      "title": "本应用已用",
+      "blurb": "dili 贴图、底图与可选联网图层的出处，便于核对许可。",
+      "items": [
+        {
+          "name": "NASA GIBS",
+          "url": "https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs",
+          "desc": "全球影像浏览服务：海温、叶绿素、积雪海冰、降水、入射太阳辐射等 WMS。本应用地球预览可选图层。",
+          "kind": "卫星影像 / WMS",
+          "license": "NASA 公开数据政策",
+          "foreign": true
+        },
+        {
+          "name": "NASA Visible Earth / Blue Marble",
+          "url": "https://visibleearth.nasa.gov/",
+          "desc": "真彩卫星影像与 Blue Marble 系列。本应用地球日景底图来源于此系公开影像。",
+          "kind": "卫星底图",
+          "license": "公有领域（NASA）",
+          "foreign": true
+        },
+        {
+          "name": "NASA SDO / HMI",
+          "url": "https://sdo.gsfc.nasa.gov/",
+          "desc": "太阳动力学天文台。本应用太阳表面贴图用 HMI Continuum。",
+          "kind": "太阳观测",
+          "license": "公有领域（NASA）",
+          "foreign": true
+        },
+        {
+          "name": "Open-Meteo",
+          "url": "https://open-meteo.com/",
+          "desc": "开源天气 API：城市天气、风场格点。本应用地球图层可选，失败可降级。",
+          "kind": "天气 API",
+          "license": "CC BY 4.0（数据说明以官网为准）",
+          "foreign": true
+        },
+        {
+          "name": "ambientCG",
+          "url": "https://ambientcg.com/",
+          "desc": "CC0 岩石、草地、积雪、冰川、土壤等 PBR 贴图。本应用切面与流域示意优先用 1K Color。",
+          "kind": "材质贴图",
+          "license": "CC0",
+          "foreign": true
+        },
+        {
+          "name": "Poly Haven",
+          "url": "https://polyhaven.com/textures",
+          "desc": "CC0 俯视地表等贴图。本应用陆地覆被（草地、岩石航拍）来源于此。",
+          "kind": "材质贴图",
+          "license": "CC0",
+          "foreign": true
+        },
+        {
+          "name": "Natural Earth / world-atlas",
+          "url": "https://www.naturalearthdata.com/",
+          "desc": "公开矢量国界与海岸。本应用须再加工为 public/geo/*-teach.json，仅作课堂示意。",
+          "kind": "矢量底图",
+          "license": "公有领域",
+          "foreign": true
+        }
+      ]
+    },
+    {
+      "id": "learn-cn",
+      "title": "国内学习与数据",
+      "blurb": "课标、气象、测绘与地球系统科学的国内公开入口。",
+      "items": [
+        {
+          "name": "国家中小学智慧教育平台",
+          "url": "https://www.zxx.edu.cn/",
+          "desc": "教育部公共服务平台，可检索中学地理课、实验与同步资源。",
+          "kind": "基础教育",
+          "license": "平台条款",
+          "foreign": false
+        },
+        {
+          "name": "中国大学 MOOC（爱课程）",
+          "url": "https://www.icourse163.org/",
+          "desc": "检索「自然地理」「气象气候」「遥感」等高校公开课，补过程原理。",
+          "kind": "公开课",
+          "license": "平台条款",
+          "foreign": false
+        },
+        {
+          "name": "天地图",
+          "url": "https://www.tianditu.gov.cn/",
+          "desc": "国家地理信息公共服务平台：影像、地形、政区注记。课堂对照实测地图时优先国内底图。",
+          "kind": "在线地图",
+          "license": "自然资源部服务条款",
+          "foreign": false
+        },
+        {
+          "name": "国家基础地理信息中心",
+          "url": "https://www.ngcc.cn/",
+          "desc": "基础测绘与公开地理信息产品说明，了解国家标准地图与审图要求。",
+          "kind": "测绘权威",
+          "license": "机构公开信息",
+          "foreign": false
+        },
+        {
+          "name": "中国气象局",
+          "url": "https://www.cma.gov.cn/",
+          "desc": "天气预报、气候监测与科普。锋面、季风、灾害天气可对照官方解释。",
+          "kind": "气象科普",
+          "license": "机构公开信息",
+          "foreign": false
+        },
+        {
+          "name": "中国气象数据网",
+          "url": "http://data.cma.cn/",
+          "desc": "气象观测与再分析数据申请入口。研究或校本课程用，注意注册与引用规范。",
+          "kind": "气象数据",
+          "license": "数据使用协议",
+          "foreign": false
+        },
+        {
+          "name": "国家地球系统科学数据中心",
+          "url": "http://www.geodata.cn/",
+          "desc": "陆地、海洋、大气等地球系统科学数据集，适合拓展课题。",
+          "kind": "科学数据",
+          "license": "数据中心协议",
+          "foreign": false
+        },
+        {
+          "name": "地理空间数据云",
+          "url": "https://www.gscloud.cn/",
+          "desc": "国内常用遥感与 DEM 检索（如 Landsat、ASTER GDEM 镜像）。下载须遵守原数据许可。",
+          "kind": "遥感 / DEM",
+          "license": "站点与原始数据许可",
+          "foreign": false
+        },
+        {
+          "name": "科学数据银行 ScienceDB",
+          "url": "https://www.scidb.cn/",
+          "desc": "国内科学数据仓储，可检索地理、生态、气候相关开放数据集。",
+          "kind": "开放数据仓储",
+          "license": "各数据集声明",
+          "foreign": false
+        },
+        {
+          "name": "中国科学院地理科学与资源研究所",
+          "url": "https://www.igsnrr.ac.cn/",
+          "desc": "人文与自然地理研究机构，有科普与数据产品线索。",
+          "kind": "科研机构",
+          "license": "机构公开信息",
+          "foreign": false
+        }
+      ]
+    },
+    {
+      "id": "imagery",
+      "title": "卫星、地球观测与浏览",
+      "blurb": "看真实地球与专题图层。多数为国外航天机构，已标注。",
+      "items": [
+        {
+          "name": "NASA Worldview",
+          "url": "https://worldview.earthdata.nasa.gov/",
+          "desc": "交互浏览全球近实时与历史卫星图层，适合对照本课 SST、积雪、火灾等。",
+          "kind": "影像浏览器",
+          "license": "NASA 公开数据",
+          "foreign": true
+        },
+        {
+          "name": "NASA Earth Observatory",
+          "url": "https://earthobservatory.nasa.gov/",
+          "desc": "图文讲解影像故事：火山、飓风、物候、城市扩张，适合备课案例。",
+          "kind": "科普影像",
+          "license": "NASA 公开内容",
+          "foreign": true
+        },
+        {
+          "name": "NASA Earthdata",
+          "url": "https://www.earthdata.nasa.gov/",
+          "desc": "NASA 地球科学数据门户，GIBS、Worldview 的上级入口。",
+          "kind": "数据门户",
+          "license": "NASA 公开数据政策",
+          "foreign": true
+        },
+        {
+          "name": "ESA Copernicus Browser",
+          "url": "https://browser.dataspace.copernicus.eu/",
+          "desc": "哨兵卫星光学 / 雷达影像在线浏览与下载。",
+          "kind": "卫星影像",
+          "license": "Copernicus 开放数据",
+          "foreign": true
+        },
+        {
+          "name": "USGS EarthExplorer",
+          "url": "https://earthexplorer.usgs.gov/",
+          "desc": "Landsat、SRTM 等经典遥感与高程检索。",
+          "kind": "遥感检索",
+          "license": "USGS 公开数据",
+          "foreign": true
+        },
+        {
+          "name": "NOAA Education",
+          "url": "https://www.noaa.gov/education",
+          "desc": "美国海洋大气局教育专栏：洋流、厄尔尼诺、飓风与气候。",
+          "kind": "气象海洋教育",
+          "license": "美国政府公开信息",
+          "foreign": true
+        }
+      ]
+    },
+    {
+      "id": "geo-data",
+      "title": "地形、矢量与开放地图",
+      "blurb": "做示意底图或校本地图前，先核对许可与国界处理规则。",
+      "items": [
+        {
+          "name": "OpenStreetMap",
+          "url": "https://www.openstreetmap.org/",
+          "desc": "全球志愿者地图。可学道路、水系注记；国界须按课堂示意规则再处理。",
+          "kind": "开放地图",
+          "license": "ODbL",
+          "foreign": true
+        },
+        {
+          "name": "OpenTopography",
+          "url": "https://opentopography.org/",
+          "desc": "高分辨率地形点云与 DEM 检索，适合地貌、断层拓展。",
+          "kind": "地形",
+          "license": "各数据集声明",
+          "foreign": true
+        },
+        {
+          "name": "SRTM（NASA / USGS）",
+          "url": "https://www.earthdata.nasa.gov/data/instruments/srtm",
+          "desc": "近全球 30–90 m 数字高程，许多国内镜像同源于此。",
+          "kind": "DEM",
+          "license": "公开",
+          "foreign": true
+        }
+      ]
+    },
+    {
+      "id": "climate",
+      "title": "气候与再分析",
+      "blurb": "对照气压带、季风、洋流时的长序列气候数据。",
+      "items": [
+        {
+          "name": "ECMWF / Copernicus Climate Data Store",
+          "url": "https://cds.climate.copernicus.eu/",
+          "desc": "ERA5 等再分析与气候服务。注册后可下月平均风、温、降水。",
+          "kind": "再分析",
+          "license": "Copernicus 许可",
+          "foreign": true
+        },
+        {
+          "name": "NOAA PSL 气候图",
+          "url": "https://psl.noaa.gov/",
+          "desc": "海温距平、遥相关、再分析图，适合讲解厄尔尼诺与大气遥相关。",
+          "kind": "气候诊断",
+          "license": "美国政府公开信息",
+          "foreign": true
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "title": "开源工具",
+      "blurb": "本应用之外，做地图与三维地球常用的开源软件。",
+      "items": [
+        {
+          "name": "QGIS",
+          "url": "https://qgis.org/",
+          "desc": "桌面 GIS：打开 GeoJSON、DEM、做填色图。校本课题常用。",
+          "kind": "桌面 GIS",
+          "license": "GPL",
+          "foreign": true
+        },
+        {
+          "name": "MapLibre GL",
+          "url": "https://maplibre.org/",
+          "desc": "开源矢量地图渲染。本应用区域课使用同一技术栈。",
+          "kind": "网页地图",
+          "license": "BSD",
+          "foreign": true
+        },
+        {
+          "name": "CesiumJS",
+          "url": "https://cesium.com/platform/cesiumjs/",
+          "desc": "开源三维地球引擎，适合超大型地形与时序影像演示（与本应用 three-globe 路线不同）。",
+          "kind": "三维地球",
+          "license": "Apache-2.0",
+          "foreign": true
+        }
+      ]
+    }
+  ]
+}
