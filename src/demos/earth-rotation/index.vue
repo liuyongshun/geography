@@ -24,15 +24,10 @@ const hour = ref(6)
 const coriolisOn = ref(true)
 const fpPlaying = ref(true)
 const coriolisMode = ref<CoriolisMode>('top')
-const selectedCityId = ref<string>('beijing')
 const topThrowT = ref(0)
 
-const CITIES = [
-  { id: 'beijing', name: '北京', lat: 39.9, lon: 116.4 },
-  { id: 'london', name: '伦敦', lat: 51.5, lon: 0 },
-  { id: 'newyork', name: '纽约', lat: 40.7, lon: -74 },
-  { id: 'sydney', name: '悉尼', lat: -33.9, lon: 151.2 },
-] as const
+/** 本课只盯北京：昼夜、地方时、镜头都以它为准 */
+const BEIJING = { name: '北京', lat: 39.9, lon: 116.4 } as const
 
 const W = 760
 const H = 440
@@ -40,11 +35,7 @@ const H = 440
 const isDayNight = computed(() => props.stepId === 'day-night')
 const isCoriolis = computed(() => props.stepId === 'coriolis')
 
-const selectedCity = computed(() => CITIES.find((c) => c.id === selectedCityId.value) ?? CITIES[0])
-const localHour = computed(() => {
-  const h = hour.value + selectedCity.value.lon / 15
-  return ((h % 24) + 24) % 24
-})
+const localHour = computed(() => ((hour.value % 24) + 24) % 24)
 const localLabel = computed(() => {
   const h = Math.floor(localHour.value)
   const m = Math.floor((localHour.value % 1) * 60)
@@ -68,9 +59,9 @@ let pathGroup: THREE.Group | null = null
 let sunLight: THREE.DirectionalLight | null = null
 let sunMesh: THREE.Object3D | null = null
 let sunLookAt: ((c: THREE.Camera) => void) | null = null
-let cityMarkers: THREE.Mesh[] = []
-let raycaster: THREE.Raycaster | null = null
-let pointer = new THREE.Vector2()
+let beijingMarker: THREE.Object3D | null = null
+let userOrbiting = false
+const _bjWorld = new THREE.Vector3()
 let disposables: THREE.Object3D[] = []
 let raf = 0
 let disposed = false
@@ -121,7 +112,6 @@ function disposeObj(obj: THREE.Object3D) {
 function teardownThree() {
   disposed = true
   cancelAnimationFrame(raf)
-  canvasRef.value?.removeEventListener('pointerdown', onGlobePointer)
   controls?.dispose()
   controls = null
   if (camera?.parent) camera.parent.remove(camera)
@@ -132,11 +122,11 @@ function teardownThree() {
     pathGroup = null
   }
   sphereTracks = []
-  cityMarkers = []
+  beijingMarker = null
+  userOrbiting = false
   sunLight = null
   sunMesh = null
   sunLookAt = null
-  raycaster = null
   for (const obj of disposables) disposeObj(obj)
   disposables = []
   globeRoot?.removeFromParent()
@@ -203,9 +193,11 @@ function makeLabelSprite(text: string, x: number, y: number, z: number, opts?: {
 }
 
 function latLonToVec(lat: number, lon: number, r: number) {
-  const φ = (lat * Math.PI) / 180
-  const λ = (lon * Math.PI) / 180
-  return new THREE.Vector3(Math.cos(φ) * Math.sin(λ), Math.sin(φ), Math.cos(φ) * Math.cos(λ)).multiplyScalar(r)
+  // 与 Three.SphereGeometry 默认 UV 一致：u=0 在 180°，u=0.5 在 0°（格林尼治 / +X）
+  const θ = ((90 - lat) * Math.PI) / 180
+  const φ = ((lon + 180) * Math.PI) / 180
+  const st = Math.sin(θ)
+  return new THREE.Vector3(-Math.cos(φ) * st, Math.cos(θ), Math.sin(φ) * st).multiplyScalar(r)
 }
 
 // ========== 昼夜更替 ==========
@@ -213,15 +205,16 @@ function setupDayNight() {
   if (!canvasRef.value || !wrapRef.value) return
   disposed = false
   disposables = []
-  cityMarkers = []
+  beijingMarker = null
+  userOrbiting = false
   threeMode = 'day-night'
   const w = wrapRef.value.clientWidth || 640
   const h = Math.max(280, wrapRef.value.clientHeight - 48)
 
   scene = new THREE.Scene()
   scene.background = new THREE.Color(0x050814)
-  camera = new THREE.PerspectiveCamera(38, w / h, 1, 1200)
-  camera.position.set(0, 36, 320)
+  camera = new THREE.PerspectiveCamera(32, w / h, 1, 1200)
+  camera.position.set(0, 80, 240)
 
   renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -231,11 +224,15 @@ function setupDayNight() {
   controls.enableDamping = true
   controls.dampingFactor = 0.08
   controls.enablePan = false
-  controls.minDistance = 160
-  controls.maxDistance = 520
+  controls.minDistance = 140
+  controls.maxDistance = 420
   controls.target.set(0, 0, 0)
   controls.addEventListener('start', () => {
     playing.value = false
+    userOrbiting = true
+  })
+  controls.addEventListener('end', () => {
+    userOrbiting = false
   })
 
   // 星空
@@ -367,60 +364,64 @@ function setupDayNight() {
   globeRoot.add(addDisposable(spinArrow))
   globeRoot.add(addDisposable(makeLabelSprite('自西向东', tip.x * 1.15, tip.y + 8, tip.z * 1.15, { scale: 0.7 })))
 
-  // 城市标记
-  for (const c of CITIES) {
-    const p = latLonToVec(c.lat, c.lon, R + 1.6)
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(1.8, 14, 12),
-      new THREE.MeshBasicMaterial({ color: c.id === selectedCityId.value ? 0xffe08a : 0x5ec8f0 }),
-    )
-    marker.position.copy(p)
-    marker.userData.cityId = c.id
-    globeRoot.add(addDisposable(marker))
-    cityMarkers.push(marker)
-    const lp = latLonToVec(c.lat, c.lon, R + 10)
-    const spr = makeLabelSprite(c.name, lp.x, lp.y, lp.z, { scale: 0.62 })
-    spr.userData.cityId = c.id
-    globeRoot.add(addDisposable(spr))
-  }
+  // 只标北京，镜头与昼夜都以它为准
+  const p = latLonToVec(BEIJING.lat, BEIJING.lon, R + 1.8)
+  const marker = new THREE.Mesh(
+    new THREE.SphereGeometry(2.4, 16, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffe08a }),
+  )
+  marker.position.copy(p)
+  globeRoot.add(addDisposable(marker))
+  beijingMarker = marker
+  const halo = new THREE.Mesh(
+    new THREE.RingGeometry(3.2, 4.6, 28),
+    new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }),
+  )
+  halo.position.copy(p)
+  halo.lookAt(0, 0, 0)
+  globeRoot.add(addDisposable(halo))
+  const lp = latLonToVec(BEIJING.lat, BEIJING.lon, R + 12)
+  globeRoot.add(addDisposable(makeLabelSprite(BEIJING.name, lp.x, lp.y, lp.z, { scale: 0.72 })))
 
-  raycaster = new THREE.Raycaster()
-  canvasRef.value.addEventListener('pointerdown', onGlobePointer)
-
-  syncCityMarkers()
   lastT = performance.now()
+  applyBeijingTime()
+  frameBeijing(true)
   loopThree()
 }
 
-function syncCityMarkers() {
-  for (const m of cityMarkers) {
-    const mat = m.material as THREE.MeshBasicMaterial
-    mat.color.set(m.userData.cityId === selectedCityId.value ? 0xffe08a : 0x5ec8f0)
-    m.scale.setScalar(m.userData.cityId === selectedCityId.value ? 1.35 : 1)
-  }
+function beijingNoonSpin() {
+  const v = latLonToVec(BEIJING.lat, BEIJING.lon, 1)
+  return Math.atan2(v.z, v.x)
 }
 
-function onGlobePointer(e: PointerEvent) {
-  if (threeMode !== 'day-night' || !renderer || !camera || !globeRoot || !raycaster) return
-  const rect = renderer.domElement.getBoundingClientRect()
-  pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-  pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
-  raycaster.setFromCamera(pointer, camera)
-  const hits = raycaster.intersectObjects(cityMarkers, false)
-  if (hits[0]?.object.userData.cityId) {
-    selectedCityId.value = String(hits[0].object.userData.cityId)
-    syncCityMarkers()
+/** 正午北京朝向太阳（+X）；hour 为北京地方时 */
+function applyBeijingTime() {
+  if (!globeRoot) return
+  const t = localHour.value
+  globeRoot.rotation.y = beijingNoonSpin() + ((t - 12) / 24) * Math.PI * 2
+}
+
+function frameBeijing(force = false) {
+  if (!camera || !globeRoot || !controls) return
+  if (userOrbiting && !force) return
+  if (beijingMarker) beijingMarker.getWorldPosition(_bjWorld)
+  else {
+    _bjWorld.copy(latLonToVec(BEIJING.lat, BEIJING.lon, 1))
+    _bjWorld.applyAxisAngle(new THREE.Vector3(0, 1, 0), globeRoot.rotation.y)
   }
+  if (_bjWorld.lengthSq() < 1e-6) return
+  const dist = force ? 250 : Math.min(400, Math.max(160, camera.position.length()))
+  camera.position.copy(_bjWorld).normalize().multiplyScalar(dist)
+  controls.target.set(0, 0, 0)
+  camera.up.set(0, 1, 0)
+  camera.lookAt(0, 0, 0)
 }
 
 function snapHour(h: number) {
   playing.value = false
   hour.value = h
-}
-
-function selectCity(id: string) {
-  selectedCityId.value = id
-  syncCityMarkers()
+  applyBeijingTime()
+  frameBeijing(true)
 }
 
 function loopThree() {
@@ -432,8 +433,8 @@ function loopThree() {
 
   if (threeMode === 'day-night' && globeRoot) {
     if (playing.value) hour.value = (hour.value + dt * 0.7) % 24
-    // 地球转；太阳相对固定在 +X，贴图经度与地方时对齐
-    globeRoot.rotation.y = ((hour.value - 12) / 24) * Math.PI * 2
+    applyBeijingTime()
+    if (playing.value || !userOrbiting) frameBeijing()
     if (camera && sunLookAt) sunLookAt(camera)
     controls?.update()
   } else if (threeMode === 'sphere') {
@@ -1157,10 +1158,6 @@ watch([coriolisOn], () => {
   else if (coriolisMode.value === 'fp') fpProgress = 0
 })
 
-watch(selectedCityId, () => {
-  if (threeMode === 'day-night') syncCityMarkers()
-})
-
 function onResize() {
   if (!wrapRef.value) return
   const w = wrapRef.value.clientWidth
@@ -1193,9 +1190,9 @@ onUnmounted(() => {
     <div class="toolbar">
       <template v-if="isDayNight">
         <label class="ctrl">
-          <span>世界时</span>
+          <span>北京时间</span>
           <input v-model.number="hour" type="range" min="0" max="23.9" step="0.1" />
-          <em>{{ String(Math.floor(hour)).padStart(2, '0') }}:00</em>
+          <em>{{ localLabel }}</em>
         </label>
         <div class="snaps">
           <button type="button" class="btn" @click="snapHour(6)">日出</button>
@@ -1206,18 +1203,6 @@ onUnmounted(() => {
         <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
           {{ playing ? '暂停自转' : '继续自转' }}
         </button>
-        <div class="cities">
-          <button
-            v-for="c in CITIES"
-            :key="c.id"
-            type="button"
-            class="chip"
-            :class="{ on: selectedCityId === c.id }"
-            @click="selectCity(c.id)"
-          >
-            {{ c.name }}
-          </button>
-        </div>
       </template>
 
       <template v-else-if="isCoriolis">
@@ -1245,10 +1230,10 @@ onUnmounted(() => {
     <div v-if="isDayNight" class="stage">
       <canvas ref="canvasRef" class="globe" />
       <aside class="hud">
-        <p class="hud-title">{{ selectedCity.name }}</p>
+        <p class="hud-title">{{ BEIJING.name }}</p>
         <p class="hud-time">{{ localLabel }}</p>
-        <p class="hud-phase">{{ dayPhase }} · 地方时</p>
-        <p class="hud-hint">点地球城市或上方芯片 · 拖动旋转视角</p>
+        <p class="hud-phase">{{ dayPhase }} · 北京地方时</p>
+        <p class="hud-hint">镜头跟着北京 · 拖动可暂时绕看</p>
       </aside>
     </div>
 
@@ -1327,26 +1312,10 @@ onUnmounted(() => {
   font-size: 11px;
   color: var(--text-400);
 }
-.snaps,
-.cities {
+.snaps {
   display: inline-flex;
   gap: 6px;
   flex-wrap: wrap;
-}
-.chip {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-500);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.chip.on {
-  border-color: var(--primary, #4cc9f0);
-  color: var(--primary-mid, #7dd8f0);
-  background: rgba(76, 201, 240, 0.12);
-  font-weight: 600;
 }
 .btn {
   font-size: 12px;
