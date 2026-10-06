@@ -1,0 +1,31 @@
+---
+description: 地理教学项目核心约定（中文、技术栈、争议底图）
+alwaysApply: true
+---
+
+# dili 项目核心
+
+- 始终使用**中文**回答与注释说明（代码标识符用英文）。
+- 技术栈：Vue 3 + Vite + Pinia + Element Plus + Tauri 2 + Three.js + `three-globe`（完整清单见 `docs/developing-dili.md`）。
+- 教材：湘教版（2019），目录在 `content/curriculum/xiangjiao.json`。
+- 路径别名：`@` → `src`，`@content` → `content`。
+- 开发教程：`docs/developing-dili.md`；引入新依赖/数据/贴图/API 时**同步更新**该文（见 `docs-sync.mdc`）。
+
+## 争议与教学示意
+
+- 国界/政区仅为**课堂示意**，不作为主权或划界依据。
+- 中国台湾几何并入 CN，不单独国家标注；城市点位可用「台北」等，归属 `country: "CN"`。
+- 新增地理数据优先放 `public/geo/*-teach.json`，并带 `disclaimer` 字段。
+
+## 地理图片与贴图
+
+- 需要真实质感时**使用必要的开源地理图片**（优先 CC0 / 公有领域，如 ambientCG、NASA 公开影像衍生），放入 `public/textures/` 并可离线打包。
+- 新贴图须登记来源与许可（目录内 `disclaimer.json` 或数据内 `source`/`license`/`disclaimer`）；界面标明课堂示意。
+- 能讲清过程则优先自绘/粒子/滤镜，不为装饰滥引网图。
+
+## 改动原则
+
+- 地球能力一律做成**可插拔图层**，禁止在 `GlobeHost` 里堆业务几何。
+- 课程与图层的对应写在绑定表，禁止在页面里硬编码一长串 `layers.xxx = true`。
+- DemoLab：运动方向须有**可见箭头** + 缓慢循环；过程类课用时间线微场景（细则见 `demo-lab.mdc`）。
+- 不擅自 `git commit` / `push`；不写无关 Markdown，**开发教程与规则更新除外**。

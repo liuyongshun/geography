@@ -1,0 +1,9 @@
+{
+  "disclaimer": "课堂示意贴图，非实测气象数据。地面：ambientCG Ground037（CC0）；云层为教学用软云纹理。不作预报依据。",
+  "license": "CC0-1.0",
+  "source": "https://ambientcg.com/",
+  "files": {
+    "ground-color.jpg": "Ground037 Color",
+    "cloud-soft.png": "procedural teaching soft cloud"
+  }
+}

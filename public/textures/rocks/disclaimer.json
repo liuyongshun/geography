@@ -1,0 +1,17 @@
+{
+  "disclaimer": "课堂示意贴图，非地质实测剖面。来源 ambientCG（CC0）。仅作教学观感，不作岩性鉴定依据。",
+  "license": "CC0-1.0",
+  "source": "https://ambientcg.com/",
+  "files": {
+    "lava-color.jpg": "Lava001",
+    "igneous-color.jpg": "Rock023",
+    "sedimentary-color.jpg": "Rock035",
+    "metamorphic-color.jpg": "Rock048",
+    "grass-color.jpg": "Grass001 Color",
+    "grass-normal.jpg": "Grass001 NormalGL",
+    "sand-color.jpg": "Ground033 Color",
+    "strata-color.jpg": "Rock029 Color",
+    "strata-normal.jpg": "Rock029 NormalGL",
+    "gneiss-color.jpg": "Rock051 Color"
+  }
+}

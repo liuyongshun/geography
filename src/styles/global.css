@@ -1,0 +1,117 @@
+/**
+ * 墨蓝观测台 Atlas Observatory
+ * 墨蓝底 + 天空蓝主色 + 沙金点缀；避开青绿赛博与紫粉霓虹。
+ * Demo 示意色见 src/demos/theme.ts（--demo-* 与之同值）。
+ */
+:root {
+  --c-void: #0a1018;
+  --c-panel: #141c28;
+  --c-steel: #2a3548;
+  --c-sky: #4aa3d9;
+  --c-sand: #e8b84a;
+
+  --primary: #4aa3d9;
+  --primary-dark: #2e7eb0;
+  --primary-mid: #7ec4eb;
+  --primary-light: rgba(74, 163, 217, 0.16);
+
+  --bg-app: #0a1018;
+  --bg-surface: #141c28;
+  --bg-subtle: #101820;
+  --bg-canvas: #080c12;
+
+  --text-900: #eef3f7;
+  --text-700: #b4c2d0;
+  --text-500: #7d8fa3;
+  --text-400: #5c6e82;
+
+  --border: #243044;
+  --border-light: #1e2838;
+
+  /* 教学语义色：低压天空蓝 / 高压琥珀 / 风带淡青 */
+  --geo-low: #4aa3d9;
+  --geo-low-soft: #6bb8e6;
+  --geo-high: #e8a317;
+  --geo-high-soft: #f0c14a;
+  --geo-wind: #7ec4eb;
+  --geo-wind-dim: #4aa3d9;
+  --geo-cell: #3d9e9a;
+  --geo-ok: #3db88a;
+  --geo-warn: #e8b84a;
+
+  /*
+   * DemoLab 示意主题（与 src/demos/theme.ts DemoHex 同值）
+   */
+  --demo-canvas: #080c12;
+  --demo-canvas-fog: #0a1018;
+  --demo-panel: #101820;
+  --demo-ink: #eef3f7;
+  --demo-ink-muted: #c5d4e4;
+  --demo-ink-dim: #8aa0b4;
+  --demo-ink-faint: #5c6e82;
+  --demo-cold: #5eb4e8;
+  --demo-cold-soft: #7ec4eb;
+  --demo-warm: #e07a5f;
+  --demo-lift: #f0d078;
+  --demo-sink: #c9a227;
+  --demo-rain: #9ec9e8;
+  --demo-low: #4aa3d9;
+  --demo-high: #e8a317;
+  --demo-high-soft: #f0c14a;
+  --demo-accent: #4aa3d9;
+  --demo-accent-soft: #c5e4f6;
+  --demo-accent-on: rgba(74, 163, 217, 0.14);
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 8px 24px rgba(0, 8, 16, 0.5);
+  --glow-teal: 0 0 0 1px rgba(74, 163, 217, 0.35), 0 0 18px rgba(74, 163, 217, 0.12);
+  --glow-sky: var(--glow-teal);
+
+  --el-color-primary: #4aa3d9;
+  --el-color-primary-light-3: #6bb8e6;
+  --el-color-primary-light-5: #8cc8ec;
+  --el-color-primary-light-7: #add8f2;
+  --el-color-primary-light-9: rgba(74, 163, 217, 0.16);
+  --el-color-primary-dark-2: #2e7eb0;
+  --el-border-radius-base: 8px;
+  --el-bg-color: #141c28;
+  --el-bg-color-page: #0a1018;
+  --el-bg-color-overlay: #141c28;
+  --el-text-color-primary: #eef3f7;
+  --el-text-color-regular: #b4c2d0;
+  --el-text-color-secondary: #7d8fa3;
+  --el-text-color-placeholder: #5c6e82;
+  --el-border-color: #243044;
+  --el-border-color-light: #1e2838;
+  --el-border-color-lighter: #1e2838;
+  --el-fill-color: #101820;
+  --el-fill-color-light: #152033;
+  --el-fill-color-blank: #101820;
+  --el-fill-color-darker: #0a1018;
+  --el-mask-color: rgba(8, 12, 18, 0.72);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Segoe UI', sans-serif;
+  color: var(--text-900);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+}

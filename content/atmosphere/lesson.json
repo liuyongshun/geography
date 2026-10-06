@@ -1,0 +1,105 @@
+{
+  "id": "atmosphere-belts-winds",
+  "title": "大气环流与气压带风带",
+  "subject": "湘教版 · 选择性必修1",
+  "disclaimer": "教学示意模型，非实时天气、非真实地形图。环流路径与气压带位置经过简化，便于观察机制。",
+  "references": [
+    "普通高中地理课程标准（2017 年版 2020 年修订）",
+    "湘教版高中地理选择性必修1《自然地理基础》：第三章 大气的运动 · 第一节 气压带、风带的形成与移动",
+    "湘教版高中地理选择性必修1：第三章 第二节 气压带、风带与气候（拓展对照）"
+  ],
+  "defaultState": {
+    "month": 3,
+    "axialTilt": true,
+    "coriolis": false,
+    "landSea": false,
+    "sectioned": false,
+    "highlightId": null
+  },
+  "steps": [
+    {
+      "id": "equatorial-low",
+      "title": "为什么赤道是低压？",
+      "durationSec": 18,
+      "subtitle": "太阳辐射在赤道附近最强，近地面空气受热膨胀上升，近地面空气减少，形成赤道低气压带。",
+      "see3d": "观察赤道附近上升的空气质点，以及指向赤道的直射光线。",
+      "see2d": "看剖面图中间的上升箭头与「赤道低气压带」色带。",
+      "allowedInteractions": ["hotspot", "sectioned"],
+      "state": { "month": 3, "coriolis": false, "landSea": false, "highlightId": "itcz" },
+      "quiz": null
+    },
+    {
+      "id": "single-to-three",
+      "title": "从单圈到三圈",
+      "durationSec": 22,
+      "subtitle": "若地球不自转，空气会在赤道上升、两极下沉，形成单圈环流。地球自转后，环流在南北半球各分裂为低纬、中纬、高纬三圈。",
+      "see3d": "三个环流圈同时转动：低纬上升下沉、中纬间接、极地下沉。",
+      "see2d": "右侧三圈环流与左侧七个气压带对齐。",
+      "allowedInteractions": ["hotspot", "sectioned"],
+      "state": { "month": 3, "coriolis": false, "highlightId": "hadley_n" },
+      "quiz": null
+    },
+    {
+      "id": "seven-belts",
+      "title": "七个气压带、六个风带",
+      "durationSec": 24,
+      "subtitle": "近地面：赤道低压、副热带高压、副极地低压、极地高压相间分布。高压指向低压的气流，形成信风、西风和极地东风。点击色带或名称，左右视图会一起高亮。",
+      "see3d": "点球体上的色带。",
+      "see2d": "点名称或箭头，对应 3D 同步高亮。",
+      "allowedInteractions": ["hotspot", "sectioned"],
+      "state": { "month": 3, "coriolis": false, "highlightId": null },
+      "quiz": null
+    },
+    {
+      "id": "coriolis",
+      "title": "打开地转偏向力",
+      "durationSec": 20,
+      "subtitle": "北半球向右偏、南半球向左偏。信风变成东北/东南信风，中纬成西风，极地成东风。试着关闭再打开，看箭头如何偏转。",
+      "see3d": "近地面粒子路径发生偏转。",
+      "see2d": "风带箭头从「南北向」变为「东北—西南」等。",
+      "allowedInteractions": ["hotspot", "coriolis", "sectioned"],
+      "state": { "month": 3, "coriolis": true, "highlightId": "trade_n" },
+      "quiz": null
+    },
+    {
+      "id": "seasonal-shift",
+      "title": "随直射点季节移动",
+      "durationSec": 26,
+      "subtitle": "气压带和风带随太阳直射点南北移动。拖动月份：北半球夏季直射点北移，赤道低压等也北移。关闭黄赤交角后，直射点停在赤道，带也不再移动。",
+      "see3d": "直射光线扫过纬度，色带跟着平移。",
+      "see2d": "整组色带相对纬度尺上下移动。",
+      "allowedInteractions": ["month", "axialTilt", "hotspot", "sectioned"],
+      "state": { "month": 6, "axialTilt": true, "coriolis": true, "highlightId": "itcz" },
+      "quiz": {
+        "id": "q-shift",
+        "prompt": "直射点移到北回归线附近时，赤道低气压带大致如何移动？",
+        "options": [
+          { "id": "a", "text": "向南移动", "correct": false },
+          { "id": "b", "text": "向北移动", "correct": true },
+          { "id": "c", "text": "位置不变", "correct": false }
+        ],
+        "explain": "气压带风带随太阳直射点的季节移动而移动。北半球夏季直射点北移，赤道低压也北移。"
+      }
+    },
+    {
+      "id": "land-sea",
+      "title": "点到海陆热力差异",
+      "durationSec": 20,
+      "subtitle": "海陆热力性质不同会打破带状分布：夏季大陆更热，易形成热低压。这是季风的重要铺垫，本课只点到为止，不做完整亚洲季风系统。",
+      "see3d": "大陆色块在夏季更「热」（偏暖色）。",
+      "see2d": "北半球夏季大陆上出现示意性热低压。",
+      "allowedInteractions": ["month", "landSea", "hotspot", "sectioned"],
+      "state": { "month": 7, "landSea": true, "coriolis": true, "highlightId": null },
+      "quiz": {
+        "id": "q-land",
+        "prompt": "打开「海陆热力差异」且为北半球夏季时，大陆近地面更易出现？",
+        "options": [
+          { "id": "a", "text": "热低压", "correct": true },
+          { "id": "b", "text": "更强的极地高压", "correct": false },
+          { "id": "c", "text": "气压带完全消失", "correct": false }
+        ],
+        "explain": "夏季大陆升温快，空气上升，近地面易形成热低压，从而扰乱理想的带状气压分布。"
+      }
+    }
+  ]
+}

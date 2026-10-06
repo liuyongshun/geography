@@ -1,0 +1,38 @@
+---
+description: 教材教程与地球 Tag 绑定规范
+globs: src/curriculum/**/*,content/curriculum/**/*,src/views/GeoLab/**/*,src/views/Course/**/*,src/views/layout/SideNav.vue
+alwaysApply: false
+---
+
+# 教材 ↔ 地球图层绑定
+
+## 唯一配置
+
+`src/curriculum/layerBindings.ts`
+
+- `TUTORIAL_LAYER_BINDINGS`：`tutorialId → LayerId[]`
+- `CHAPTER_FALLBACK`：章节 id 正则兜底（教程未单独登记时）
+- `resolveTutorialLayers(tutorialId, chapterId?)` → 完整开关表
+
+```typescript
+// ✅ 新增一课绑定
+'TUTORIAL_LAYER_BINDINGS': {
+  'water-cycle': ['rivers', 'cities', 'sun'],
+}
+
+// ❌ 禁止在 Vue 里散落
+store.layers.rivers = true
+store.layers.cities = true
+```
+
+## 跳转约定
+
+- 已上线课（`status: ready`）：侧栏直达 `/lab/:tutorialId`，`GeoLab` 内 `store.bindTutorial(id)`。
+- 筹备中课：进教程页，提供「在地球上预览」→ 同上实验室并激活 Tag。
+- `GeoLab` 根据 `tutorialId` 决定是否显示气压带完整课步（目前仅 `atmosphere-belts-winds`）。
+
+## 绑定原则
+
+- 每课只开**讲清该知识点所需**图层，默认关掉其余（`earth` 除外）。
+- 人文课优先：`countries` / `cities` / `nightlights`；自然过程课优先：`pressure` / `circulation` / `rivers` / `plates` / `sun`。
+- 改 `xiangjiao.json` 新增 `tutorials[].id` 时，同步补绑定或确认章节兜底足够。

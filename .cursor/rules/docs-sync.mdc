@@ -1,0 +1,25 @@
+---
+description: 引入新依赖/数据/贴图/API 时必须同步更新开发教程
+alwaysApply: true
+---
+
+# 教程与资源同步
+
+权威开发指导：`docs/developing-dili.md`（技术栈 + 开源资源目录 + 开发步骤）。
+
+## 何时必须更新教程
+
+同一变更内更新 `docs/developing-dili.md` 对应章节（技术栈 / 开源资源 / 过程范式等），当引入或更换：
+
+- npm / 图形库依赖
+- `public/textures/**`、模型、音频等媒体
+- `public/geo/**` 或数据构建脚本的来源
+- 外部 API / WMS（GIBS、Open-Meteo 等）
+- 新的推荐资源站或许可约定
+- 新的 Demo / 图层开发范式（并同步相关 `.cursor/rules/*.mdc`）
+
+## 资源落地要求
+
+- 地理贴图优先 **CC0 / 公有领域**，可离线打包；禁止无授权网图。
+- 新贴图目录附 `disclaimer.json`（或数据文件内 `disclaimer` + `source` + `license`）。
+- 需要真实质感时**使用必要的地理图片资源**（如 ambientCG 岩石、Blue Marble 底图），不为堆砌而堆贴图。

@@ -1,0 +1,52 @@
+---
+description: 可插拔地球图层开发规范（GlobeHost / Layer）
+globs: src/engine/globe/**/*
+alwaysApply: false
+---
+
+# 地球图层（可插拔）
+
+## 架构
+
+```
+GlobeHost（场景/相机/循环/拾取）
+  └── layers/* 实现 GlobeLayer
+catalog.ts     ← Tag 文案与默认开关唯一来源
+types.ts       ← LayerId / GlobeLayer 契约
+```
+
+坐标与 `three-globe` 对齐：用 `geoPosition(lat, lng, relAlt)`（见 `coords.ts`），勿混用旧的 `latLonToVec` 经度符号。
+
+## 新增图层步骤（必须按序）
+
+1. 在 `types.ts` 的 `LayerId` 增加 id。
+2. 在 `catalog.ts` 的 `LAYER_CATALOG` 登记：`label` / `description` / `category` / `defaultOn`。
+3. 新建 `layers/<id>.ts`，实现 `GlobeLayer`（`mount` / `setEnabled` / `update?` / `tick?` / `pick?` / `dispose`）。
+4. 在 `host.ts` 的 `factories` 数组注册（**`EarthLayer` 必须最先**）。
+5. 若属某课知识点：在 `src/curriculum/layerBindings.ts` 绑定。
+
+```typescript
+// ✅ 图层只挂 overlayRoot 或操作 ctx.globe
+export class RiversLayer implements GlobeLayer {
+  readonly meta = layerMeta('rivers')!
+  mount(ctx) { ctx.overlayRoot.add(this.group) }
+  setEnabled(on) { this.group.visible = on }
+  update(state) { this.group.visible = state.layers.rivers }
+  dispose() { /* 释放 geometry/material */ }
+}
+```
+
+## 约束
+
+- 夜光与 SST/叶绿素/积雪海冰/降水/人口密度/**太阳辐射** 经 `EarthLayer` 切换表面，彼此互斥。
+- **互斥 Tag** 写在 `layerConflicts.ts` 的 `LAYER_MUTEX_GROUPS`；开启一侧会自动关闭同组其它层并提示。新增会互相盖住/语义打架的层时务必登记。
+- GIBS 专题贴图经 `gibs.ts` 拉取并与底图合成；勿直接把 WMS URL 塞给 TextureLoader（MIME 常误标）。
+- 「实况风场」与「大气环流」互斥：前者 Open-Meteo 格点，后者教材示意粒子。
+- 中文注记用 Canvas Sprite（`labels.ts`）；`three-globe` 自带字体不含汉字。
+- 拾取返回 `GlobePick`（`belt` | `city`），城市优先于气压带。
+- `sticky: true` 仅地球底图；`stub: true` 表示占位未实现。
+
+## 本地教学数据
+
+- `public/geo/countries-teach.json`、`cities-teach.json`、`rivers-teach.json`、`plates-teach.json`
+- 重建国界包：`npm run build:countries`

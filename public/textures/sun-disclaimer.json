@@ -1,0 +1,8 @@
+{
+  "disclaimer": "课堂示意：太阳表面影像来自 NASA SDO/HMI Continuum，公有领域。不作观测预报依据。",
+  "license": "NASA public domain",
+  "source": "https://sdo.gsfc.nasa.gov/",
+  "files": {
+    "sun-hmi.jpg": "SDO HMI Continuum (HMIIF)"
+  }
+}
