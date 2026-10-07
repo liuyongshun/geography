@@ -277,7 +277,7 @@ function setupScene() {
   fill.position.set(120, 40, 80)
   scene.add(fill)
 
-  // 太阳：SDO/HMI 日面
+  // 太阳：SDO/AIA 日面
   const sunRoot = new THREE.Group()
   sunRoot.position.set(-210, 0, 0)
   const sunVis = makeSunBillboard(18)

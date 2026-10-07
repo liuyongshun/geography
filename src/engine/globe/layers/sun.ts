@@ -9,7 +9,7 @@ import { makeSunBillboard } from '@/engine/sunVisual'
 const SUBSOLAR_LNG = 0
 
 /**
- * 太阳直射：SDO/HMI 日面（去黑底、朝向相机）+ 地表直射点。
+ * 太阳直射：SDO/AIA 日面（去黑底、朝向相机）+ 地表直射点。
  */
 export class SunLayer implements GlobeLayer {
   readonly meta: LayerMeta = layerMeta('sun')!

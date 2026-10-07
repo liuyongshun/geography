@@ -9,6 +9,9 @@ export const TUTORIAL_LAYER_BINDINGS: Record<string, LayerId[]> = {
   // 已上线：气压带风带
   'atmosphere-belts-winds': ['pressure', 'circulation', 'sun'],
 
+  // 选必1 · 地球运动
+  'earth-rotation': ['sun', 'terminator', 'timezones', 'latlon', 'degrees'],
+
   // 宇宙中的地球
   'universe-earth': ['latlon', 'degrees', 'compass', 'sun'],
   'solar-influence': ['insolation', 'sun', 'terminator', 'degrees'],

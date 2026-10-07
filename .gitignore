@@ -46,3 +46,7 @@ src-tauri/*.msi
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+
+# 本地课件 / Office 临时锁文件（不入库）
+*.pptx
+~$*

@@ -107,7 +107,7 @@ export const LAYER_CATALOG: LayerMeta[] = [
   {
     id: 'sun',
     label: '太阳直射',
-    description: 'NASA SDO 太阳影像 + 直射点；主光随直射方向（本地贴图）',
+    description: 'NASA SDO/AIA 171 金黄日面 + 直射点；主光随直射方向（本地贴图）',
     category: 'atmosphere',
     defaultOn: true,
   },

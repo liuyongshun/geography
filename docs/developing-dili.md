@@ -47,13 +47,14 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 | ISO → 中文国名 | `i18n-iso-countries` |
 | 气象图标（线稿 SVG） | `@meteocons/svg` |
 
-运行：Node.js 18+；桌面端另需 Rust（rustup）。
+运行：Node.js 18+；桌面端另需 Rust（rustup）与 MSVC C++ 构建工具。**默认启动桌面端**。
 
 ```bash
 npm install
-npm run dev            # http://localhost:1430
+npm run tauri dev        # 默认：桌面窗口（自动起/复用 Vite :1430）
+npm run tauri build      # 安装包
 npm run build:countries  # 重建 public/geo/countries-teach.json
-npm run tauri dev
+# 仅调试前端时才：npm run dev
 ```
 
 ---
@@ -69,7 +70,7 @@ npm run tauri dev
 | `earth-blue-marble.jpg` | 地球日景底图 | 教学用卫星真彩底图（NASA Blue Marble 系公开影像常见衍生）；课堂示意 |
 | `earth-night.jpg` | 夜光 / 昼夜对照 | 教学用夜光示意贴图 |
 | `earth-topology.png` | 地形 bump | 教学用起伏示意 |
-| `sun-hmi.jpg` | 太阳表面 | NASA SDO **HMI Continuum**，公有领域 |
+| `sun-hmi.jpg` | 太阳表面（日面 billboard） | NASA SDO **AIA 171Å** 1024px（`latest_1024_0171.jpg`），公有领域；经 `sunVisual` 抠黑底并提对比（文件名历史原因仍为 sun-hmi） |
 | `sun-disclaimer.json` | 太阳贴图声明 | 非观测预报 |
 | `rocks/lava-color.jpg` | 熔岩观感 | ambientCG **Lava001**，**CC0** |
 | `rocks/igneous-color.jpg` | 岩浆岩 | ambientCG **Rock023**，**CC0** |
@@ -189,7 +190,7 @@ src-tauri/               桌面壳
 4. **贴图**：需要质感时用 ambientCG 等 CC0，放 `public/textures/...`，写 `disclaimer.json`；UI 角标注明「示意 · 非鉴定」。
 5. **勿**用干巴静态框图或仅虚线滚动冒充过程。
 
-样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）。
+样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时，对照选必1·1.1 PPT）。
 
 ---
 

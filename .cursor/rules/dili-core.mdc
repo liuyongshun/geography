@@ -6,6 +6,9 @@ alwaysApply: true
 # dili 项目核心
 
 - 始终使用**中文**回答与注释说明（代码标识符用英文）。
+- **启动项目 = 桌面端**：用户说「启动 / 跑起来 / 启动项目」时，执行 `npm run tauri dev`（必要时先加载 VS BuildTools 的 `VsDevCmd`）。
+  - Tauri 会经 `beforeDevCommand`（`dev:frontend`）自动起或复用 Vite（1430）；**禁止**单独执行 `npm run dev` / 只开浏览器模式来「启动项目」。
+  - 仅当用户**明确**要求「网页 / 浏览器 / 前端 Vite」时，才单独 `npm run dev`。
 - 技术栈：Vue 3 + Vite + Pinia + Element Plus + Tauri 2 + Three.js + `three-globe`（完整清单见 `docs/developing-dili.md`）。
 - 教材：湘教版（2019），目录在 `content/curriculum/xiangjiao.json`。
 - 路径别名：`@` → `src`，`@content` → `content`。

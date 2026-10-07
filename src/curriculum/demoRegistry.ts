@@ -34,8 +34,10 @@ export const DEMO_REGISTRY: DemoEntry[] = [
     status: 'ready',
     engine: 'mixed',
     steps: [
-      { id: 'day-night', title: '昼夜更替' },
+      { id: 'basics', title: '方向·周期·速度' },
+      { id: 'day-night', title: '昼夜与晨昏线' },
       { id: 'coriolis', title: '地转偏向' },
+      { id: 'timezones', title: '时区与区时' },
     ],
     load: () => import('@/demos/earth-rotation/index.vue'),
   },

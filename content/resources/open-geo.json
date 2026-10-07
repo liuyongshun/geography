@@ -25,9 +25,9 @@
           "foreign": true
         },
         {
-          "name": "NASA SDO / HMI",
+          "name": "NASA SDO / AIA",
           "url": "https://sdo.gsfc.nasa.gov/",
-          "desc": "太阳动力学天文台。本应用太阳表面贴图用 HMI Continuum。",
+          "desc": "太阳动力学天文台。本应用太阳表面贴图用 AIA 171Å（金黄日冕）。",
           "kind": "太阳观测",
           "license": "公有领域（NASA）",
           "foreign": true

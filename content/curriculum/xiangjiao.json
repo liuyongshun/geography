@@ -422,7 +422,19 @@
                 {
                   "id": "xx1-c1-s1",
                   "title": "第一节 地球的自转",
-                  "tutorials": [{ "id": "earth-rotation", "title": "自转意义：昼夜与地转偏向", "status": "ready", "kind": "process", "minutes": 16, "objectives": ["理解地方时与地转偏向力"] }]
+                  "tutorials": [{
+                    "id": "earth-rotation",
+                    "title": "地球自转：方向速度与地理意义",
+                    "status": "ready",
+                    "kind": "process",
+                    "minutes": 22,
+                    "objectives": [
+                      "区分自转方向、太阳日与恒星日、角速度与线速度",
+                      "解释昼夜交替与晨昏线",
+                      "理解地转偏向力（北右南左）",
+                      "掌握时区划分与区时换算（东加西减）"
+                    ]
+                  }]
                 },
                 {
                   "id": "xx1-c1-s2",

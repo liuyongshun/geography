@@ -1,8 +1,9 @@
 {
-  "disclaimer": "课堂示意：太阳表面影像来自 NASA SDO/HMI Continuum，公有领域。不作观测预报依据。",
+  "disclaimer": "课堂示意：太阳表面影像来自 NASA SDO/AIA 171Å，公有领域。不作观测预报依据。",
   "license": "NASA public domain",
-  "source": "https://sdo.gsfc.nasa.gov/",
+  "source": "https://sdo.gsfc.nasa.gov/assets/img/latest/latest_1024_0171.jpg",
+  "sourcePage": "https://sdo.gsfc.nasa.gov/",
   "files": {
-    "sun-hmi.jpg": "SDO HMI Continuum (HMIIF)"
+    "sun-hmi.jpg": "SDO AIA 171Å，1024px 全盘金黄日冕（文件名沿用 sun-hmi.jpg 以免改各处引用）"
   }
 }

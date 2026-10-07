@@ -14,10 +14,10 @@
 
 ```bash
 npm install
-npm run dev          # http://localhost:1430 → 左目录右内容；默认 #/resources
-                     # #/t/... 教程说明  #/lab/... 地球预览  #/demo/... 演示课
-npm run tauri dev    # 桌面
+npm run tauri dev    # 默认：桌面端（自动起/复用 Vite :1430）
+                     # 壳内路由 #/resources #/t/... #/lab/... #/demo/...
 npm run tauri build  # 安装包 dmg / nsis / msi
+# 仅调试网页时才：npm run dev
 ```
 
 改课编辑 `content/atmosphere/lesson.json`；改目录编辑 `content/curriculum/xiangjiao.json`。界面标明教学示意，非实时天气。
