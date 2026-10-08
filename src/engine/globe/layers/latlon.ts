@@ -1,19 +1,18 @@
 import * as THREE from 'three'
+import { Demo3, EarthDashDeg, GlobeGridWidth } from '@/demos/theme'
 import type { GlobeContext, GlobeFrameState, GlobeLayer, LayerMeta } from '../types'
 import { layerMeta } from '../catalog'
 import {
   disposeObject3D,
+  makeGlobeDashedParallel,
   makeGlobeTube,
   meridianPoints,
   parallelPoints,
 } from '../gridLines'
 
-/** 经纬网配色：青蓝，与时区橙黄区分 */
-const COLOR_GRID = 0x5ec8f0
-const COLOR_MAJOR = 0xb8f0ff // 赤道 / 本初子午线更亮
-
 /**
  * 经纬网：自绘加粗管线（不用 three-globe 自带细灰线）。
+ * 色/径与 `theme.ts` Earth 线型规范一致。
  */
 export class LatLonLayer implements GlobeLayer {
   readonly meta: LayerMeta = layerMeta('latlon')!
@@ -21,36 +20,48 @@ export class LatLonLayer implements GlobeLayer {
   private enabled = false
 
   mount(ctx: GlobeContext) {
-    // 关掉内置几乎看不见的 graticules
     ctx.globe?.showGraticules(false)
 
     const clip = ctx.clipPlane ? [ctx.clipPlane] : []
 
-    // 经线：每 30°；0°/180° 加粗
+    // 经线：每 30°；0°/180° 加粗（本初 / 日界示意）
     for (let lng = -180; lng < 180; lng += 30) {
       const major = lng === 0 || Math.abs(lng) === 180
       this.group.add(
         makeGlobeTube(
           meridianPoints(lng),
-          major ? 0.55 : 0.32,
-          major ? COLOR_MAJOR : COLOR_GRID,
-          major ? 0.92 : 0.72,
+          major ? GlobeGridWidth.major : GlobeGridWidth.minor,
+          major ? Demo3.earthGridMajor : Demo3.earthGrid,
+          major ? 0.92 : 0.55,
           clip,
         ),
       )
     }
 
-    // 纬线：每 30°；赤道加粗
+    // 纬线：次要 30°/60°；赤道用规范绿青色加粗
     for (const lat of [-60, -30, 0, 30, 60]) {
-      const major = lat === 0
+      const isEq = lat === 0
       this.group.add(
         makeGlobeTube(
           parallelPoints(lat),
-          major ? 0.55 : 0.32,
-          major ? COLOR_MAJOR : COLOR_GRID,
-          major ? 0.92 : 0.72,
+          isEq ? GlobeGridWidth.major : GlobeGridWidth.minor,
+          isEq ? Demo3.earthEquator : Demo3.earthGrid,
+          isEq ? 0.92 : 0.55,
           clip,
         ),
+      )
+    }
+
+    // 回归线 / 极圈：虚线（与赤道实线区分）
+    const { dash, gap } = EarthDashDeg.special
+    for (const lat of [23.5, -23.5]) {
+      this.group.add(
+        makeGlobeDashedParallel(lat, GlobeGridWidth.minor * 1.05, Demo3.earthTropic, 0.78, dash, gap, clip),
+      )
+    }
+    for (const lat of [66.5, -66.5]) {
+      this.group.add(
+        makeGlobeDashedParallel(lat, GlobeGridWidth.minor * 1.05, Demo3.earthPolar, 0.72, dash, gap, clip),
       )
     }
 
@@ -65,8 +76,6 @@ export class LatLonLayer implements GlobeLayer {
 
   update(state: GlobeFrameState) {
     this.group.visible = Boolean(state.layers.latlon)
-    // 确保不用内置细线
-    // globe 可能尚未就绪时由 earth 误开，这里每次关掉
   }
 
   dispose() {

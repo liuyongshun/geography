@@ -1,0 +1,10 @@
+{
+  "disclaimer": "课堂示意：陆地浅海地形真彩合成图，来自 NASA Visible Earth Blue Marble。不作测绘或观测依据。",
+  "license": "NASA public domain",
+  "source": "https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/land_shallow_topo_2048.jpg",
+  "sourcePage": "https://visibleearth.nasa.gov/images/57752/blue-marble-land-surface-shallow-water-and-shaded-topography",
+  "credit": "NASA Earth Observatory",
+  "files": {
+    "earth-period.jpg": "Blue Marble land surface, shallow water and shaded topography，2048px；恒星日/太阳日、地转偏向、时区示意球"
+  }
+}

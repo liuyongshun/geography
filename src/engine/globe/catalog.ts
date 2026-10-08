@@ -30,7 +30,7 @@ export const LAYER_CATALOG: LayerMeta[] = [
   {
     id: 'latlon',
     label: '经纬网',
-    description: '经线 / 纬线格网（青色加粗）',
+    description: '经纬网 + 赤道/本初子午加粗 + 回归线/极圈（Earth 线型规范）',
     category: 'geo',
     defaultOn: false,
   },

@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as d3 from 'd3'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
+import { Demo3, DemoHex, EarthDashDeg, EarthLineWidth } from '@/demos/theme'
 import { makeSunBillboard } from '@/engine/sunVisual'
 
 const props = defineProps<{
@@ -20,7 +21,6 @@ type PeriodKind = 'compare' | 'sidereal' | 'solar'
 const wrapRef = ref<HTMLElement>()
 const canvasRef = ref<HTMLCanvasElement>()
 const svgRef = ref<SVGSVGElement | null>(null)
-const tzSvgRef = ref<SVGSVGElement | null>(null)
 const fpCanvasRef = ref<HTMLCanvasElement | null>(null)
 const sphereCanvasRef = ref<HTMLCanvasElement | null>(null)
 
@@ -80,6 +80,15 @@ const periodSpinVsNeed = computed(() => {
 
 /** day-night */
 const terminatorFocus = ref<TerminatorSide>('both')
+type DnCamView = 'overview' | 'edge' | 'day' | 'night' | 'pole'
+const dnCamView = ref<DnCamView>('overview')
+const DN_CAM_VIEWS: { id: DnCamView; label: string }[] = [
+  { id: 'overview', label: '日地全景' },
+  { id: 'edge', label: '侧视晨昏' },
+  { id: 'day', label: '昼半球' },
+  { id: 'night', label: '夜半球' },
+  { id: 'pole', label: '北极俯视' },
+]
 
 /** timezones */
 const tzCityA = ref('beijing')
@@ -158,40 +167,73 @@ const beijingLocalVsZone = computed(() => {
   return { local, zone }
 })
 
+/** 晨昏课步：公转角与年积日（自转–公转按 365.25 联动） */
+const dnOrbitDeg = computed(() => {
+  const d = ((dnOrbitAngle.value * 180) / Math.PI) % 360
+  return d < 0 ? d + 360 : d
+})
+const dnYearDay = computed(() => Math.floor((dnOrbitDeg.value / 360) * DAYS_PER_YEAR) + 1)
+
 // —— 昼夜 / 通用 Three ——
 let renderer: THREE.WebGLRenderer | null = null
 let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
 let controls: OrbitControls | null = null
 let globeRoot: THREE.Group | null = null
+/** 晨昏：公转定位 → 地轴倾斜（惯性系固定）→ 自转 */
+let earthOrbitRoot: THREE.Group | null = null
+let earthTiltRoot: THREE.Group | null = null
+let earthSpinRoot: THREE.Group | null = null
+let termRoot: THREE.Group | null = null
 let pathGroup: THREE.Group | null = null
 let sunLight: THREE.DirectionalLight | null = null
+let sunPoint: THREE.PointLight | null = null
 let sunMesh: THREE.Object3D | null = null
 let sunLookAt: ((c: THREE.Camera) => void) | null = null
 let beijingMarker: THREE.Object3D | null = null
 let userOrbiting = false
 const _bjWorld = new THREE.Vector3()
+const _sunDir = new THREE.Vector3()
+const _qTilt = new THREE.Quaternion()
+const _vTmp = new THREE.Vector3()
 let disposables: THREE.Object3D[] = []
 let raf = 0
 let disposed = false
 let lastT = 0
-/** day-night | sphere | basics */
-let threeMode: 'day-night' | 'sphere' | 'basics' | null = null
-let terminatorRing: THREE.Line | null = null
+/** day-night | sphere | basics | timezones */
+let threeMode: 'day-night' | 'sphere' | 'basics' | 'timezones' | null = null
+let tzMarkerGroup: THREE.Group | null = null
+let tzSunLight: THREE.DirectionalLight | null = null
+const TZ_EARTH_R = 100
+let terminatorRing: THREE.Mesh | null = null
+let terminatorGlow: THREE.Mesh | null = null
 let dawnHighlight: THREE.Mesh | null = null
 let duskHighlight: THREE.Mesh | null = null
 let dayHemLabel: THREE.Sprite | null = null
 let nightHemLabel: THREE.Sprite | null = null
+/** 黄赤交角；公转平面 = XZ（Y 向上），地轴倾向 +X（夏至：地球在 -X 时北极向日） */
+const OBLIQUITY_RAD = (23.5 * Math.PI) / 180
+const DN_ORBIT_R = 260
+const DN_EARTH_R = 48
+const DN_SUN_R = 38
+/** 恒星年天数（公转一周） */
+const DAYS_PER_YEAR = 365.25
+/** 真值约 0.99°/日；课堂加速使公转肉眼可见 */
+const ORBIT_TEACH_DEG_PER_DAY = 18
+const ORBIT_TRUE_DEG_PER_DAY = 360 / DAYS_PER_YEAR
+/** 公转角（弧度），自转由 hour 驱动；θ=π 时地球在 -X */
+const dnOrbitAngle = ref(Math.PI)
+let sceneAmbient: THREE.AmbientLight | null = null
+let sceneFill: THREE.DirectionalLight | null = null
 let spinArrowMesh: THREE.Mesh | null = null
 let spinArcLine: THREE.Line | null = null
 let latitudeRing: THREE.Line | null = null
-let latMarker: THREE.Mesh | null = null
+let latMarker: THREE.Object3D | null = null
 let periodPhase = 0
 let lastSpeedLat = -1
 /** 恒星日/太阳日场景 */
 let periodOrbitRoot: THREE.Group | null = null
 let periodEarthSpin: THREE.Group | null = null
-let periodMarker: THREE.Group | null = null
 let periodSunLine: THREE.Line | null = null
 let periodOrbitArc: THREE.Line | null = null
 let periodGuideGroup: THREE.Group | null = null
@@ -220,6 +262,11 @@ let fpDisposed = false
 let fpLastT = 0
 let fpProgress = 0
 let fpGroundShift = 0
+
+/** 俯视地转偏向：极地正射真实底图（缓存） */
+let polarMapN: string | null = null
+let polarMapS: string | null = null
+let polarMapLoading = false
 
 function addDisposable(obj: THREE.Object3D) {
   disposables.push(obj)
@@ -255,9 +302,11 @@ function teardownThree() {
   beijingMarker = null
   userOrbiting = false
   sunLight = null
+  sunPoint = null
   sunMesh = null
   sunLookAt = null
   terminatorRing = null
+  terminatorGlow = null
   dawnHighlight = null
   duskHighlight = null
   dayHemLabel = null
@@ -269,15 +318,23 @@ function teardownThree() {
   lastSpeedLat = -1
   periodOrbitRoot = null
   periodEarthSpin = null
-  periodMarker = null
   periodSunLine = null
   periodOrbitArc = null
   periodGuideGroup = null
   periodGhostGroup = null
   periodLabelGroup = null
   basicsSceneKind = null
+  sceneAmbient = null
+  sceneFill = null
+  tzMarkerGroup = null
+  tzSunLight = null
+  dnOrbitAngle.value = Math.PI
   for (const obj of disposables) disposeObj(obj)
   disposables = []
+  termRoot = null
+  earthSpinRoot = null
+  earthTiltRoot = null
+  earthOrbitRoot = null
   globeRoot?.removeFromParent()
   globeRoot = null
   renderer?.dispose()
@@ -341,12 +398,12 @@ function makeLabelSprite(
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
-    depthTest: false,
+    depthTest: true,
     depthWrite: false,
   })
   const sprite = new THREE.Sprite(mat)
   sprite.position.set(x, y, z)
-  sprite.renderOrder = 10
+  sprite.renderOrder = 1
   const s = opts?.scale ?? 1
   // 按像素比例缩放，保证中文完整可见
   const worldW = (canvas.width / 64) * 11 * s
@@ -355,10 +412,15 @@ function makeLabelSprite(
   return sprite
 }
 
+/**
+ * 地理坐标 → 与 Three.js SphereGeometry + 常见等距圆柱贴图对齐：
+ * 经度 0°（本初子午）在 +X，东经向 -Z，北纬向 +Y。
+ */
 function latLonToVec(lat: number, lon: number, r: number) {
   const φ = (lat * Math.PI) / 180
   const λ = (lon * Math.PI) / 180
-  return new THREE.Vector3(Math.cos(φ) * Math.sin(λ), Math.sin(φ), Math.cos(φ) * Math.cos(λ)).multiplyScalar(r)
+  const c = Math.cos(φ)
+  return new THREE.Vector3(c * Math.cos(λ), Math.sin(φ), -c * Math.sin(λ)).multiplyScalar(r)
 }
 
 function buildEarthSphere(R: number) {
@@ -380,17 +442,175 @@ function buildEarthSphere(R: number) {
   )
 }
 
+function tubeMat(color: number, opacity = 1) {
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent: opacity < 1,
+    opacity,
+    depthWrite: false,
+  })
+}
+
+/** 纬线圈（水平环，实线） */
+function makeEarthParallel(latDeg: number, R: number, tubeR: number, color: number, opacity: number) {
+  const φ = (latDeg * Math.PI) / 180
+  const lift = R + 0.35
+  const rr = Math.max(0.5, Math.cos(φ) * lift)
+  const mesh = new THREE.Mesh(new THREE.TorusGeometry(rr, tubeR, 6, 72), tubeMat(color, opacity))
+  mesh.rotation.x = Math.PI / 2
+  mesh.position.y = Math.sin(φ) * lift
+  return mesh
+}
+
+/** 纬线圈虚线（回归线 / 极圈） */
+function makeEarthDashedParallel(latDeg: number, R: number, tubeR: number, color: number, opacity: number) {
+  const group = new THREE.Group()
+  const { dash, gap } = EarthDashDeg.special
+  const lift = R + 0.35
+  const φ = (latDeg * Math.PI) / 180
+  const y = Math.sin(φ) * lift
+  const rr = Math.max(0.5, Math.cos(φ) * lift)
+  const step = Math.max(2, Math.floor(dash / 3))
+  for (let lon0 = -180; lon0 < 180; lon0 += dash + gap) {
+    const pts: THREE.Vector3[] = []
+    for (let lon = lon0; lon <= lon0 + dash; lon += step) {
+      const λ = (lon * Math.PI) / 180
+      pts.push(new THREE.Vector3(Math.sin(λ) * rr, y, Math.cos(λ) * rr))
+    }
+    if (pts.length < 2) continue
+    const curve = new THREE.CatmullRomCurve3(pts)
+    group.add(
+      new THREE.Mesh(
+        new THREE.TubeGeometry(curve, Math.max(4, pts.length), tubeR, 5, false),
+        tubeMat(color, opacity),
+      ),
+    )
+  }
+  return group
+}
+
+/** 经线圈（过两极大圆） */
+function makeEarthMeridian(lonDeg: number, R: number, tubeR: number, color: number, opacity: number) {
+  const mesh = new THREE.Mesh(new THREE.TorusGeometry(R + 0.35, tubeR, 6, 72), tubeMat(color, opacity))
+  mesh.rotation.y = Math.PI / 2 + (lonDeg * Math.PI) / 180
+  return mesh
+}
+
+/**
+ * 晨昏课步：地轴 + 经纬网 + 赤道/本初子午/回归线/极圈（EarthLine 规范）
+ */
+function addEarthAxisEquator(group: THREE.Group, R: number) {
+  const axisLen = R * 2 + 40
+  const axisR = EarthLineWidth.axis
+  group.add(
+    addDisposable(
+      new THREE.Mesh(new THREE.CylinderGeometry(axisR, axisR, axisLen, 14), tubeMat(Demo3.earthAxis, 0.95)),
+    ),
+  )
+  const coneH = 7
+  const poleN = new THREE.Mesh(
+    new THREE.ConeGeometry(EarthLineWidth.poleCone, coneH, 12),
+    tubeMat(Demo3.earthAxis),
+  )
+  poleN.position.y = axisLen / 2 + coneH * 0.35
+  group.add(addDisposable(poleN))
+  const poleS = new THREE.Mesh(
+    new THREE.ConeGeometry(EarthLineWidth.poleCone, coneH, 12),
+    tubeMat(Demo3.earthAxis),
+  )
+  poleS.position.y = -(axisLen / 2 + coneH * 0.35)
+  poleS.rotation.x = Math.PI
+  group.add(addDisposable(poleS))
+  group.add(
+    addDisposable(makeLabelSprite('N', 0, axisLen / 2 + 14, 0, { scale: 0.48, bg: false, color: DemoHex.earthAxis })),
+  )
+  group.add(
+    addDisposable(makeLabelSprite('S', 0, -(axisLen / 2 + 14), 0, { scale: 0.48, bg: false, color: DemoHex.earthAxis })),
+  )
+
+  // 次要经纬网（每 30°，淡）
+  for (let lon = -150; lon <= 180; lon += 30) {
+    if (lon === 0 || Math.abs(lon) === 180) continue
+    group.add(addDisposable(makeEarthMeridian(lon, R, EarthLineWidth.grid, Demo3.earthGrid, 0.35)))
+  }
+  for (const lat of [-60, -30, 30, 60]) {
+    group.add(addDisposable(makeEarthParallel(lat, R, EarthLineWidth.grid, Demo3.earthGrid, 0.35)))
+  }
+
+  // 本初子午线（亮）
+  group.add(addDisposable(makeEarthMeridian(0, R, EarthLineWidth.gridMajor, Demo3.earthPrime, 0.9)))
+  group.add(
+    addDisposable(
+      makeLabelSprite('本初子午', 4, 10, R + 8, { scale: 0.38, bg: false, color: DemoHex.earthPrime }),
+    ),
+  )
+
+  // 赤道（绿青，最醒目纬线）
+  group.add(addDisposable(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.92)))
+  group.add(
+    addDisposable(
+      makeLabelSprite('赤道', R * 0.55, 5, R * 0.72, { scale: 0.4, bg: false, color: DemoHex.earthEquator }),
+    ),
+  )
+
+  // 南北回归线 ±23.5°（虚线）
+  for (const lat of [23.5, -23.5]) {
+    group.add(addDisposable(makeEarthDashedParallel(lat, R, EarthLineWidth.special, Demo3.earthTropic, 0.8)))
+  }
+  group.add(
+    addDisposable(
+      makeLabelSprite('北回归线', R * 0.35, R * 0.42, R * 0.55, {
+        scale: 0.36,
+        bg: false,
+        color: DemoHex.earthTropic,
+      }),
+    ),
+  )
+  group.add(
+    addDisposable(
+      makeLabelSprite('南回归线', R * 0.35, -R * 0.42, R * 0.55, {
+        scale: 0.36,
+        bg: false,
+        color: DemoHex.earthTropic,
+      }),
+    ),
+  )
+
+  // 南北极圈 ±66.5°（虚线）
+  for (const lat of [66.5, -66.5]) {
+    group.add(addDisposable(makeEarthDashedParallel(lat, R, EarthLineWidth.special, Demo3.earthPolar, 0.72)))
+  }
+  group.add(
+    addDisposable(
+      makeLabelSprite('北极圈', R * 0.18, R * 0.78, R * 0.28, {
+        scale: 0.34,
+        bg: false,
+        color: DemoHex.earthPolar,
+      }),
+    ),
+  )
+  group.add(
+    addDisposable(
+      makeLabelSprite('南极圈', R * 0.18, -R * 0.78, R * 0.28, {
+        scale: 0.34,
+        bg: false,
+        color: DemoHex.earthPolar,
+      }),
+    ),
+  )
+}
+
 function addAxisAndPoles(group: THREE.Group, R: number) {
   const axisLen = R * 2 + 48
   group.add(
     addDisposable(
-      new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, axisLen, 12), new THREE.MeshBasicMaterial({ color: 0xffe08a })),
+      new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, axisLen, 12), new THREE.MeshBasicMaterial({ color: Demo3.earthMarker })),
     ),
   )
-  const poleN = new THREE.Mesh(new THREE.ConeGeometry(3.0, 9, 12), new THREE.MeshBasicMaterial({ color: 0xffe08a }))
+  const poleN = new THREE.Mesh(new THREE.ConeGeometry(3.0, 9, 12), new THREE.MeshBasicMaterial({ color: Demo3.earthMarker }))
   poleN.position.y = axisLen / 2 + 2
   group.add(addDisposable(poleN))
-  const poleS = new THREE.Mesh(new THREE.ConeGeometry(3.0, 9, 12), new THREE.MeshBasicMaterial({ color: 0xffe08a }))
+  const poleS = new THREE.Mesh(new THREE.ConeGeometry(3.0, 9, 12), new THREE.MeshBasicMaterial({ color: Demo3.earthMarker }))
   poleS.position.y = -(axisLen / 2 + 2)
   poleS.rotation.x = Math.PI
   group.add(addDisposable(poleS))
@@ -422,7 +642,7 @@ function addSpinDirectionArc(group: THREE.Group, R: number, latDeg = 10) {
   group.add(addDisposable(makeLabelSprite('自西向东', tip.x * 1.12, tip.y + 10, tip.z * 1.12, { scale: 0.68 })))
 }
 
-function initThreeCanvas(mode: 'day-night' | 'sphere' | 'basics') {
+function initThreeCanvas(mode: 'day-night' | 'sphere' | 'basics' | 'timezones') {
   const canvas = mode === 'sphere' ? sphereCanvasRef.value : canvasRef.value
   if (!canvas || !wrapRef.value) return false
   disposed = false
@@ -435,7 +655,7 @@ function initThreeCanvas(mode: 'day-night' | 'sphere' | 'basics') {
 
   scene = new THREE.Scene()
   scene.background = new THREE.Color(0x050814)
-  camera = new THREE.PerspectiveCamera(38, w / h, 1, 1200)
+  camera = new THREE.PerspectiveCamera(38, w / h, 1, mode === 'day-night' ? 4000 : 1200)
   camera.position.set(0, 36, 320)
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -450,21 +670,27 @@ function initThreeCanvas(mode: 'day-night' | 'sphere' | 'basics') {
   controls.maxDistance = 520
   controls.target.set(0, 0, 0)
   if (mode === 'day-night') {
-    controls.minDistance = 140
-    controls.maxDistance = 420
-    controls.addEventListener('start', () => {
-      playing.value = false
-      userOrbiting = true
-    })
-    controls.addEventListener('end', () => {
-      userOrbiting = false
-    })
+    // 自由环视：不强制复位镜头、不因拖动暂停动画
+    controls.enablePan = true
+    controls.enableRotate = true
+    controls.minDistance = 60
+    controls.maxDistance = 2200
+    controls.minPolarAngle = 0.02
+    controls.maxPolarAngle = Math.PI - 0.02
+    controls.minAzimuthAngle = -Infinity
+    controls.maxAzimuthAngle = Infinity
+  } else if (mode === 'timezones') {
+    controls.enableRotate = true
+    controls.minDistance = 160
+    controls.maxDistance = 480
+    camera.position.set(80, 40, 280)
   }
 
-  scene.add(new THREE.AmbientLight(0x1a2838, 0.4))
-  const fill = new THREE.DirectionalLight(0x4a6a90, 0.22)
-  fill.position.set(-160, -20, -80)
-  scene.add(fill)
+  sceneAmbient = new THREE.AmbientLight(0x1a2838, 0.4)
+  scene.add(sceneAmbient)
+  sceneFill = new THREE.DirectionalLight(0x4a6a90, 0.22)
+  sceneFill.position.set(-160, -20, -80)
+  scene.add(sceneFill)
 
   // 星空
   {
@@ -525,12 +751,15 @@ function updateLatitudeSpeedVisual(R: number) {
   }
   if (latMarker) {
     globeRoot.remove(latMarker)
+    latMarker.traverse((obj) => {
+      if (obj !== latMarker) disposeObj(obj)
+    })
     disposeObj(latMarker)
     latMarker = null
   }
   if (lat >= 89.5) {
     latMarker = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 10), new THREE.MeshBasicMaterial({ color: 0xff9f43 }))
-    latMarker.position.set(0, R, 0)
+    latMarker.position.set(0, R + 1.2, 0)
     globeRoot.add(addDisposable(latMarker))
     return
   }
@@ -540,7 +769,7 @@ function updateLatitudeSpeedVisual(R: number) {
   const pts: THREE.Vector3[] = []
   for (let i = 0; i <= 64; i++) {
     const a = (i / 64) * Math.PI * 2
-    pts.push(new THREE.Vector3(Math.sin(a) * rr, y, Math.cos(a) * rr))
+    pts.push(new THREE.Vector3(Math.sin(a) * (rr + 0.5), y, Math.cos(a) * (rr + 0.5)))
   }
   latitudeRing = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
@@ -548,14 +777,20 @@ function updateLatitudeSpeedVisual(R: number) {
   )
   globeRoot.add(addDisposable(latitudeRing))
 
-  const a0 = periodPhase * Math.PI * 2
-  const p = new THREE.Vector3(Math.sin(a0) * (rr + 2), y, Math.cos(a0) * (rr + 2))
-  latMarker = new THREE.Mesh(new THREE.ConeGeometry(2.4, 7, 10), new THREE.MeshBasicMaterial({ color: 0xff9f43 }))
-  latMarker.position.copy(p)
-  const tangent = new THREE.Vector3(Math.cos(a0), 0, -Math.sin(a0))
-  latMarker.lookAt(p.clone().add(tangent))
-  latMarker.rotateX(Math.PI / 2)
-  globeRoot.add(addDisposable(latMarker))
+  // 定位标固定在纬线圈朝镜头一侧，随地球自转；勿再单独绕圈（否则像一直空转）
+  const a0 = 0
+  const p = new THREE.Vector3(Math.sin(a0) * (rr + 2.2), y, Math.cos(a0) * (rr + 2.2))
+  const mark = new THREE.Group()
+  const pad = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 10), new THREE.MeshBasicMaterial({ color: 0xff9f43 }))
+  pad.position.copy(p)
+  mark.add(pad)
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(1.8, 5.5, 10), new THREE.MeshBasicMaterial({ color: 0xff9f43 }))
+  // a=0 处切向为 +X（自西向东）
+  tip.position.set(p.x + 5, p.y, p.z)
+  tip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0))
+  mark.add(tip)
+  latMarker = mark
+  globeRoot.add(addDisposable(mark))
 }
 
 // ========== 方向·周期·速度 ==========
@@ -572,33 +807,36 @@ function setupBasicsDirection() {
   sunLight = new THREE.DirectionalLight(0xfff1d0, 1.35)
   sunLight.position.set(200, 60, 80)
   scene.add(sunLight)
+  if (sceneAmbient) {
+    sceneAmbient.color.set(0x3a4a5c)
+    sceneAmbient.intensity = 0.55
+  }
 
-  const earth = buildEarthSphere(R)
-  globeRoot.add(addDisposable(earth))
+  // 真彩底图（示意球），避免夜光贴图把赤道区压太暗
+  {
+    const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
+    tex.colorSpace = THREE.SRGBColorSpace
+    globeRoot.add(
+      addDisposable(
+        new THREE.Mesh(
+          new THREE.SphereGeometry(R, 72, 56),
+          new THREE.MeshPhongMaterial({ map: tex, shininess: 10, specular: new THREE.Color(0x223344) }),
+        ),
+      ),
+    )
+  }
   globeRoot.add(
     addDisposable(
       new THREE.Mesh(
         new THREE.SphereGeometry(R + 2.4, 48, 32),
-        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.1, side: THREE.BackSide, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.08, side: THREE.BackSide, depthWrite: false }),
       ),
     ),
   )
 
-  addAxisAndPoles(globeRoot, R)
+  // 地轴 + 经纬网 + 赤道/本初子午/回归线/极圈
+  addEarthAxisEquator(globeRoot, R)
   addSpinDirectionArc(globeRoot, R, 8)
-
-  {
-    const pts: THREE.Vector3[] = []
-    for (let i = 0; i <= 72; i++) {
-      const a = (i / 72) * Math.PI * 2
-      pts.push(new THREE.Vector3(Math.sin(a) * (R + 0.6), 0, Math.cos(a) * (R + 0.6)))
-    }
-    globeRoot.add(
-      addDisposable(
-        new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x5ec8f0, opacity: 0.7, transparent: true })),
-      ),
-    )
-  }
 
   updateLatitudeSpeedVisual(R)
   applyPoleCamera()
@@ -707,7 +945,7 @@ function addOrbitSpan(
   span.add(
     addDisposable(
       makeLabelSprite(label, lx, ly, 4, {
-        scale: 0.58 * 4,
+        scale: 1.05,
         bg: false,
         color: '#ffe6a8',
       }),
@@ -772,42 +1010,44 @@ function setupBasicsPeriod() {
     scene.add(addDisposable(periodOrbitArc))
   }
 
-  const starHalf = PERIOD_ORBIT_R * 0.72
-  const addStarRef = (x: number, dashed: boolean, opacity: number) => {
-    periodGuideGroup!.add(
+  // 灰线：太阳 → 起点 / 恒星日终点 / 太阳日终点（三条都画）
+  {
+    const sunZ = new THREE.Vector3(0, 0, -0.5)
+    const toStart = makePeriodLine(sunZ, p0.clone().setZ(-0.5), 0xd8e4f0, { opacity: 0.88 })
+    toStart.userData.guide = 'sun-ray-start'
+    periodGuideGroup.add(addDisposable(toStart))
+    const toSid = makePeriodLine(sunZ.clone(), pSid.clone().setZ(-0.5), 0xd8e4f0, { opacity: 0.7 })
+    toSid.userData.guide = 'sun-ray-sid'
+    periodGuideGroup.add(addDisposable(toSid))
+    const toSol = makePeriodLine(sunZ.clone(), pSol.clone().setZ(-0.5), 0xd8e4f0, { opacity: 0.7 })
+    toSol.userData.guide = 'sun-ray-sol'
+    periodGuideGroup.add(addDisposable(toSol))
+  }
+
+  // 起 / 恒 / 太：空心大圆标记
+  for (const [p, label, dy] of [
+    [p0, '起', -26],
+    [pSid, '恒', -34],
+    [pSol, '太', -26],
+  ] as const) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(5.2, 7.6, 36),
+      new THREE.MeshBasicMaterial({
+        color: 0xff8a7a,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    )
+    ring.position.set(p.x, p.y, 0.8)
+    periodGhostGroup.add(addDisposable(ring))
+    const side = label === '太' ? 18 : label === '恒' ? -16 : 0
+    periodGhostGroup.add(
       addDisposable(
-        makePeriodLine(
-          new THREE.Vector3(x, -starHalf * 0.85, -1),
-          new THREE.Vector3(x, starHalf * 0.35, -1),
-          0x4ecadb,
-          { dashed, opacity },
-        ),
+        makeLabelSprite(label, p.x + side, p.y + dy, 2, { scale: 1.15, bg: false, color: '#ffd0a8' }),
       ),
     )
-  }
-  // 起点与太阳共线（p0.x === 0），只画一条
-  addStarRef(0, false, 0.75)
-  addStarRef(pSid.x, false, 0.75)
-  addStarRef(pSol.x, true, 0.35)
-
-  periodGuideGroup.add(addDisposable(makePeriodLine(new THREE.Vector3(0, 0, -0.5), p0.clone().setZ(-0.5), 0xd8e4f0, { opacity: 0.85 })))
-  periodGuideGroup.add(
-    addDisposable(makePeriodLine(new THREE.Vector3(0, 0, -0.5), pSid.clone().setZ(-0.5), 0xd8e4f0, { dashed: true, opacity: 0.4 })),
-  )
-  periodGuideGroup.add(addDisposable(makePeriodLine(new THREE.Vector3(0, 0, -0.5), pSol.clone().setZ(-0.5), 0xd8e4f0, { opacity: 0.75 })))
-
-  for (const [p, label] of [
-    [p0, '起'],
-    [pSid, '恒'],
-    [pSol, '太'],
-  ] as const) {
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(3.2, 20),
-      new THREE.MeshBasicMaterial({ color: 0xff6b6b, transparent: true, opacity: 0.85, depthWrite: false }),
-    )
-    dot.position.set(p.x, p.y, 0.8)
-    periodGhostGroup.add(addDisposable(dot))
-    periodGhostGroup.add(addDisposable(makeLabelSprite(label, p.x, p.y - 14, 2, { scale: 0.45 })))
   }
 
   // 恒星日偏前段、太阳日偏后段，径向错开，避免互相遮挡
@@ -821,30 +1061,22 @@ function setupBasicsPeriod() {
     labelOut: 28,
     labelAlong: 16,
   })
-  periodLabelGroup.add(
-    addDisposable(makeLabelSprite('遥远恒星方向', pSid.x * 0.55, starHalf * 0.28, 3, { scale: 0.5 })),
-  )
 
   periodOrbitRoot = new THREE.Group()
   scene.add(periodOrbitRoot)
   periodEarthSpin = new THREE.Group()
   periodOrbitRoot.add(periodEarthSpin)
 
-  const earth = buildEarthSphere(PERIOD_EARTH_R)
-  ;(earth.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.35
-  periodEarthSpin.add(addDisposable(earth))
-
-  periodMarker = new THREE.Group()
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.7, 0.7, PERIOD_EARTH_R + 9, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffffff }),
-  )
-  shaft.position.y = (PERIOD_EARTH_R + 9) / 2
-  periodMarker.add(addDisposable(shaft))
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(2.1, 6, 10), new THREE.MeshBasicMaterial({ color: 0xffe08a }))
-  tip.position.y = PERIOD_EARTH_R + 11
-  periodMarker.add(addDisposable(tip))
-  periodEarthSpin.add(periodMarker)
+  // 示意球用浅海真彩贴图 + Basic（不受夜光/暗光照拖累）
+  {
+    const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
+    tex.colorSpace = THREE.SRGBColorSpace
+    const earth = new THREE.Mesh(
+      new THREE.SphereGeometry(PERIOD_EARTH_R, 64, 48),
+      new THREE.MeshBasicMaterial({ map: tex }),
+    )
+    periodEarthSpin.add(addDisposable(earth))
+  }
 
   periodSunLine = makePeriodLine(new THREE.Vector3(), new THREE.Vector3(1, 0, 0), 0xffb040, { opacity: 0.95 })
   scene.add(addDisposable(periodSunLine))
@@ -885,6 +1117,16 @@ function syncPeriodScene() {
       else if (child.userData?.span === '太阳日') child.visible = showSol
     }
   }
+  if (periodGuideGroup) {
+    const showSid = periodKind.value !== 'solar'
+    const showSol = periodKind.value !== 'sidereal'
+    for (const child of periodGuideGroup.children) {
+      const g = child.userData?.guide as string | undefined
+      if (g === 'sun-ray-sid') child.visible = showSid
+      else if (g === 'sun-ray-sol') child.visible = showSol
+      else if (g === 'sun-ray-start') child.visible = true
+    }
+  }
   if (periodGhostGroup) {
     // 对照：三点都显示；单模式：只保留起 + 对应终点
     const showSidMark = periodKind.value !== 'solar'
@@ -906,145 +1148,338 @@ function restartPeriod() {
 
 // ========== 昼夜更替 ==========
 function setupDayNight() {
-  if (!initThreeCanvas('day-night') || !globeRoot || !scene || !canvasRef.value) return
-  const R = 72
+  if (!initThreeCanvas('day-night') || !globeRoot || !scene || !canvasRef.value || !camera || !controls) return
+  const R = DN_EARTH_R
 
-  sunLight = new THREE.DirectionalLight(0xfff1d0, 1.55)
-  sunLight.position.set(220, 40, 0)
-  scene.add(sunLight)
+  if (sceneAmbient) {
+    sceneAmbient.color.set(0x03050a)
+    sceneAmbient.intensity = 0.04
+  }
+  if (sceneFill) {
+    sceneFill.color.set(0x0a1520)
+    sceneFill.intensity = 0.02
+    sceneFill.position.set(0, 40, 80)
+  }
 
-  const sunVis = makeSunBillboard(16)
+  // 太阳在原点（可视区内）
+  const sunVis = makeSunBillboard(DN_SUN_R)
   sunMesh = sunVis.group
   sunLookAt = sunVis.lookAt
-  sunMesh.position.copy(sunLight.position).setLength(240)
+  sunMesh.position.set(0, 0, 0)
   scene.add(addDisposable(sunMesh))
+  scene.add(addDisposable(makeLabelSprite('太阳', 0, -DN_SUN_R - 14, 0, { scale: 0.55, bg: false, color: DemoHex.earthMarker })))
 
-  const earth = buildEarthSphere(R)
-  ;(earth.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.55
-  globeRoot.add(addDisposable(earth))
+  // 仅用平行光沿日→地，避免点光包抄照亮夜半球
+  sunLight = new THREE.DirectionalLight(0xfff2d6, 3.4)
+  sunLight.position.set(0, 0, 0)
+  scene.add(sunLight)
+  scene.add(sunLight.target)
+  // 太阳表面微光（极短距，不照地球背面）
+  sunPoint = new THREE.PointLight(0xffc878, 1.2, DN_SUN_R * 2.2, 2)
+  sunPoint.position.set(0, 0, 0)
+  scene.add(sunPoint)
 
-  globeRoot.add(
-    addDisposable(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(R + 2.8, 48, 32),
-        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.12, side: THREE.BackSide, depthWrite: false }),
-      ),
-    ),
-  )
-
-  addAxisAndPoles(globeRoot, R)
-  addSpinDirectionArc(globeRoot, R, 10)
-
-  // 晨昏线：太阳在 +X，分界在 YZ 平面大圆
+  // 公转轨道（黄道面 XZ，Y 向上）
   {
     const pts: THREE.Vector3[] = []
     for (let i = 0; i <= 96; i++) {
       const a = (i / 96) * Math.PI * 2
-      pts.push(new THREE.Vector3(0, Math.cos(a) * (R + 0.8), Math.sin(a) * (R + 0.8)))
+      pts.push(new THREE.Vector3(Math.cos(a) * DN_ORBIT_R, 0, Math.sin(a) * DN_ORBIT_R))
     }
-    terminatorRing = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.95 }),
+    scene.add(
+      addDisposable(
+        new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(pts),
+          new THREE.LineBasicMaterial({ color: Demo3.earthTropic, transparent: true, opacity: 0.55 }),
+        ),
+      ),
     )
-    globeRoot.add(addDisposable(terminatorRing))
+    scene.add(
+      addDisposable(
+        makeLabelSprite('公转轨道', DN_ORBIT_R * 0.75, 8, DN_ORBIT_R * 0.35, {
+          scale: 0.42,
+          bg: false,
+          color: DemoHex.earthTropic,
+        }),
+      ),
+    )
   }
 
-  // 晨线 / 昏线高亮弧（半圈 torus）
+  // 层级：公转平移 → 地轴倾斜（惯性系固定，不随公转摇摆）→ 自转
+  earthOrbitRoot = new THREE.Group()
+  globeRoot.add(earthOrbitRoot)
+  earthTiltRoot = new THREE.Group()
+  earthTiltRoot.rotation.z = OBLIQUITY_RAD
+  earthOrbitRoot.add(earthTiltRoot)
+  earthSpinRoot = new THREE.Group()
+  earthTiltRoot.add(earthSpinRoot)
+
+  const earth = buildEarthSphere(R)
+  const mat = earth.material as THREE.MeshPhongMaterial
+  // 夜光克制，避免洗掉夜半球；昼侧靠平行光拉亮
+  mat.emissiveIntensity = 0.38
+  mat.shininess = 18
+  mat.specular = new THREE.Color(0x1a2838)
+  mat.color = new THREE.Color(0xffffff)
+  earthSpinRoot.add(addDisposable(earth))
+  earthSpinRoot.add(
+    addDisposable(
+      new THREE.Mesh(
+        new THREE.SphereGeometry(R + 2.2, 48, 32),
+        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.08, side: THREE.BackSide, depthWrite: false }),
+      ),
+    ),
+  )
+
+  addEarthAxisEquator(earthSpinRoot, R)
+  addSpinDirectionArc(earthSpinRoot, R, 12)
+  if (spinArcLine) {
+    const sm = spinArcLine.material as THREE.LineBasicMaterial
+    sm.color.set(Demo3.earthSpin)
+    sm.opacity = 0.75
+  }
+  if (spinArrowMesh) {
+    ;(spinArrowMesh.material as THREE.MeshBasicMaterial).color.set(Demo3.earthSpin)
+  }
+  earthSpinRoot.add(
+    addDisposable(
+      makeLabelSprite('地轴 23.5°', 12, R + 28, 0, { scale: 0.4, bg: false, color: DemoHex.earthAxis }),
+    ),
+  )
+
+  // 晨昏线：挂在地球旁，每帧对准日地连线（+X=向日）
+  termRoot = new THREE.Group()
+  scene.add(termRoot)
+
+  // 夜半球罩：本地 -X（背日）半壳；Three 球 phi=0 在 -X，取 [-π/2, π/2] 即 x≤0
+  termRoot.add(
+    addDisposable(
+      new THREE.Mesh(
+        new THREE.SphereGeometry(R + 0.4, 56, 40, -Math.PI / 2, Math.PI),
+        new THREE.MeshBasicMaterial({
+          color: 0x02060f,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      ),
+    ),
+  )
+  // 分割面：过球心、垂直日地连线
   {
-    dawnHighlight = new THREE.Mesh(
-      new THREE.TorusGeometry(R + 1.2, 0.9, 8, 48, Math.PI),
-      new THREE.MeshBasicMaterial({ color: 0x5ec8f0, transparent: true, opacity: 0.85 }),
+    const divide = new THREE.Mesh(
+      new THREE.CircleGeometry(R + 0.15, 72),
+      new THREE.MeshBasicMaterial({
+        color: Demo3.earthTerminatorSoft,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
     )
-    dawnHighlight.rotation.y = Math.PI / 2
-    dawnHighlight.rotation.z = Math.PI / 2
-    globeRoot.add(addDisposable(dawnHighlight))
-
-    duskHighlight = new THREE.Mesh(
-      new THREE.TorusGeometry(R + 1.2, 0.9, 8, 48, Math.PI),
-      new THREE.MeshBasicMaterial({ color: 0xff9f43, transparent: true, opacity: 0.85 }),
+    divide.rotation.y = Math.PI / 2
+    termRoot.add(addDisposable(divide))
+    const divideEdge = new THREE.Mesh(
+      new THREE.RingGeometry(R - 0.2, R + 0.35, 72),
+      new THREE.MeshBasicMaterial({
+        color: Demo3.earthTerminator,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
     )
-    duskHighlight.rotation.y = Math.PI / 2
-    duskHighlight.rotation.z = -Math.PI / 2
-    globeRoot.add(addDisposable(duskHighlight))
+    divideEdge.rotation.y = Math.PI / 2
+    termRoot.add(addDisposable(divideEdge))
   }
 
-  dayHemLabel = makeLabelSprite('昼半球', R * 0.85, 12, 0, { scale: 0.72 })
-  nightHemLabel = makeLabelSprite('夜半球', -R * 0.85, 12, 0, { scale: 0.72 })
-  globeRoot.add(addDisposable(dayHemLabel))
-  globeRoot.add(addDisposable(nightHemLabel))
-  globeRoot.add(addDisposable(makeLabelSprite('晨线', 4, R * 0.55, R * 0.75, { scale: 0.55 })))
-  globeRoot.add(addDisposable(makeLabelSprite('昏线', 4, R * 0.55, -R * 0.75, { scale: 0.55 })))
+  terminatorGlow = new THREE.Mesh(
+    new THREE.TorusGeometry(R + 0.55, EarthLineWidth.soft * 1.15, 14, 96),
+    tubeMat(Demo3.earthTerminatorSoft, 0.28),
+  )
+  terminatorGlow.rotation.y = Math.PI / 2
+  termRoot.add(addDisposable(terminatorGlow))
 
+  terminatorRing = new THREE.Mesh(
+    new THREE.TorusGeometry(R + 0.5, EarthLineWidth.thin, 10, 128),
+    tubeMat(Demo3.earthTerminator, 0.7),
+  )
+  terminatorRing.rotation.y = Math.PI / 2
+  termRoot.add(addDisposable(terminatorRing))
+
+  // 晨 / 昏两段加粗异色弧，一眼能分出两条半圈
+  dawnHighlight = new THREE.Mesh(
+    new THREE.TorusGeometry(R + 1.6, EarthLineWidth.bold * 1.55, 10, 72, Math.PI),
+    tubeMat(Demo3.earthDawn, 1),
+  )
+  dawnHighlight.rotation.y = Math.PI / 2
+  dawnHighlight.rotation.z = Math.PI / 2
+  termRoot.add(addDisposable(dawnHighlight))
+
+  duskHighlight = new THREE.Mesh(
+    new THREE.TorusGeometry(R + 1.6, EarthLineWidth.bold * 1.55, 10, 72, Math.PI),
+    tubeMat(Demo3.earthDusk, 1),
+  )
+  duskHighlight.rotation.y = Math.PI / 2
+  duskHighlight.rotation.z = -Math.PI / 2
+  termRoot.add(addDisposable(duskHighlight))
+
+  dayHemLabel = makeLabelSprite('昼', R * 0.9, 6, 0, { scale: 0.55, bg: false, color: DemoHex.earthDayLabel })
+  nightHemLabel = makeLabelSprite('夜', -R * 0.9, 6, 0, { scale: 0.55, bg: false, color: DemoHex.earthNightLabel })
+  termRoot.add(addDisposable(dayHemLabel))
+  termRoot.add(addDisposable(nightHemLabel))
+  termRoot.add(
+    addDisposable(makeLabelSprite('晨', 6, R * 0.5, R * 0.85, { scale: 0.42, bg: false, color: DemoHex.earthDawn })),
+  )
+  termRoot.add(
+    addDisposable(makeLabelSprite('昏', 6, R * 0.5, -R * 0.85, { scale: 0.42, bg: false, color: DemoHex.earthDusk })),
+  )
   syncTerminatorFocus()
 
-  // 只标北京，镜头与昼夜都以它为准
-  const p = latLonToVec(BEIJING.lat, BEIJING.lon, R + 1.8)
-  const marker = new THREE.Mesh(
-    new THREE.SphereGeometry(2.4, 16, 14),
-    new THREE.MeshBasicMaterial({ color: 0xffe08a }),
-  )
+  const p = latLonToVec(BEIJING.lat, BEIJING.lon, R + 1.5)
+  const marker = new THREE.Mesh(new THREE.SphereGeometry(1.8, 14, 12), tubeMat(Demo3.earthMarker, 0.95))
   marker.position.copy(p)
-  globeRoot.add(addDisposable(marker))
+  earthSpinRoot.add(addDisposable(marker))
   beijingMarker = marker
   const halo = new THREE.Mesh(
-    new THREE.RingGeometry(3.2, 4.6, 28),
-    new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }),
+    new THREE.RingGeometry(2.4, 3.4, 24),
+    new THREE.MeshBasicMaterial({
+      color: Demo3.earthMarker,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.7,
+      depthWrite: false,
+    }),
   )
   halo.position.copy(p)
   halo.lookAt(0, 0, 0)
-  globeRoot.add(addDisposable(halo))
-  const lp = latLonToVec(BEIJING.lat, BEIJING.lon, R + 12)
-  globeRoot.add(addDisposable(makeLabelSprite(BEIJING.name, lp.x, lp.y, lp.z, { scale: 0.72 })))
+  earthSpinRoot.add(addDisposable(halo))
+  const lp = latLonToVec(BEIJING.lat, BEIJING.lon, R + 10)
+  earthSpinRoot.add(
+    addDisposable(makeLabelSprite(BEIJING.name, lp.x, lp.y, lp.z, { scale: 0.45, bg: false, color: DemoHex.earthMarker })),
+  )
 
+  // 夏至示意：地球在 -X，地轴倾向 +X（北极向日）
+  dnOrbitAngle.value = Math.PI
+  hour.value = 12
   lastT = performance.now()
-  applyBeijingTime()
-  frameBeijing(true)
+  syncDayNightScene()
+  frameDayNight()
   loopThree()
 }
 
 function syncTerminatorFocus() {
   const f = terminatorFocus.value
-  if (dawnHighlight) dawnHighlight.visible = f === 'both' || f === 'dawn'
-  if (duskHighlight) duskHighlight.visible = f === 'both' || f === 'dusk'
-  if (terminatorRing) {
-    const mat = terminatorRing.material as THREE.LineBasicMaterial
-    mat.opacity = f === 'both' ? 0.95 : 0.35
+  if (dawnHighlight) {
+    dawnHighlight.visible = f === 'both' || f === 'dawn'
+    ;(dawnHighlight.material as THREE.MeshBasicMaterial).opacity = f === 'dusk' ? 0.25 : 1
+  }
+  if (duskHighlight) {
+    duskHighlight.visible = f === 'both' || f === 'dusk'
+    ;(duskHighlight.material as THREE.MeshBasicMaterial).opacity = f === 'dawn' ? 0.25 : 1
+  }
+  const coreOp = f === 'both' ? 0.7 : 0.35
+  const glowOp = f === 'both' ? 0.28 : 0.12
+  if (terminatorRing) (terminatorRing.material as THREE.MeshBasicMaterial).opacity = coreOp
+  if (terminatorGlow) (terminatorGlow.material as THREE.MeshBasicMaterial).opacity = glowOp
+}
+
+/**
+ * 自转角：绕地轴使「北京」在给定地方时对准太阳。
+ * 正午：北京经线朝向太阳；小时角每 15°/h。
+ */
+function spinFacingSun(hourLocal: number) {
+  if (!earthTiltRoot || !earthOrbitRoot) return 0
+  earthTiltRoot.updateMatrixWorld(true)
+  earthTiltRoot.getWorldQuaternion(_qTilt)
+  const inv = _qTilt.clone().invert()
+  // 地球→太阳（世界系）
+  _sunDir.copy(earthOrbitRoot.position).multiplyScalar(-1).normalize()
+  // 变到地轴倾斜后的本体水平面
+  _vTmp.copy(_sunDir).applyQuaternion(inv)
+  const city = latLonToVec(BEIJING.lat, BEIJING.lon, 1)
+  const sunAz = Math.atan2(_vTmp.x, _vTmp.z)
+  const cityAz = Math.atan2(city.x, city.z)
+  const hourAngle = ((hourLocal - 12) / 24) * Math.PI * 2
+  return sunAz - cityAz + hourAngle
+}
+
+function syncDayNightScene() {
+  if (!earthOrbitRoot || !earthSpinRoot || !termRoot) return
+  earthOrbitRoot.position.set(
+    Math.cos(dnOrbitAngle.value) * DN_ORBIT_R,
+    0,
+    Math.sin(dnOrbitAngle.value) * DN_ORBIT_R,
+  )
+
+  earthSpinRoot.rotation.y = spinFacingSun(localHour.value)
+
+  _sunDir.set(0, 0, 0).sub(earthOrbitRoot.position).normalize()
+  termRoot.position.copy(earthOrbitRoot.position)
+  termRoot.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), _sunDir)
+
+  if (sunLight) {
+    sunLight.position.set(0, 0, 0)
+    sunLight.target.position.copy(earthOrbitRoot.position)
+    sunLight.target.updateMatrixWorld()
   }
 }
 
-function beijingNoonSpin() {
-  const v = latLonToVec(BEIJING.lat, BEIJING.lon, 1)
-  return Math.atan2(v.z, v.x)
-}
+const _dnAlong = new THREE.Vector3()
+const _dnCamSide = new THREE.Vector3()
+const _dnCamPos = new THREE.Vector3()
+const _dnCamTarget = new THREE.Vector3()
+const _dnCamUp = new THREE.Vector3(0, 1, 0)
 
-/** 正午北京朝向太阳（+X）；hour 为北京地方时 */
-function applyBeijingTime() {
-  if (!globeRoot) return
-  const t = localHour.value
-  globeRoot.rotation.y = beijingNoonSpin() + ((t - 12) / 24) * Math.PI * 2
-}
+/** 预设镜头：只点选瞬间跳一次，不每帧跟随（否则公转看起来像停住） */
+function applyDayNightView(kind: DnCamView = dnCamView.value) {
+  if (!camera || !controls || !earthOrbitRoot) return
+  dnCamView.value = kind
 
-function frameBeijing(force = false) {
-  if (!camera || !globeRoot || !controls) return
-  if (userOrbiting && !force) return
-  if (beijingMarker) beijingMarker.getWorldPosition(_bjWorld)
-  else {
-    _bjWorld.copy(latLonToVec(BEIJING.lat, BEIJING.lon, 1))
-    _bjWorld.applyAxisAngle(new THREE.Vector3(0, 1, 0), globeRoot.rotation.y)
+  const ep = earthOrbitRoot.position
+  const R = DN_EARTH_R
+  const orbitR = Math.max(ep.length(), 1)
+  _dnAlong.copy(ep).multiplyScalar(1 / orbitR)
+  _dnCamSide.crossVectors(_dnCamUp, _dnAlong)
+  if (_dnCamSide.lengthSq() < 1e-8) _dnCamSide.set(1, 0, 0)
+  else _dnCamSide.normalize()
+  camera.up.copy(_dnCamUp)
+
+  if (kind === 'overview') {
+    _dnCamTarget.copy(ep).multiplyScalar(0.42)
+    _dnCamPos
+      .copy(_dnCamTarget)
+      .addScaledVector(_dnCamSide, orbitR * 0.92)
+      .addScaledVector(_dnCamUp, orbitR * 0.48)
+  } else if (kind === 'edge') {
+    _dnCamTarget.copy(ep)
+    _dnCamPos.copy(ep).addScaledVector(_dnCamSide, R * 4.6).addScaledVector(_dnCamUp, R * 0.55)
+  } else if (kind === 'day') {
+    _dnCamTarget.copy(ep)
+    const fromSun = Math.max(DN_SUN_R * 1.85, orbitR - R * 3.8)
+    _dnCamPos.copy(_dnAlong).multiplyScalar(fromSun).addScaledVector(_dnCamUp, R * 0.4)
+  } else if (kind === 'night') {
+    _dnCamTarget.copy(ep)
+    _dnCamPos.copy(_dnAlong).multiplyScalar(orbitR + R * 3.8).addScaledVector(_dnCamUp, R * 0.4)
+  } else {
+    _dnCamTarget.copy(ep)
+    _dnCamPos.copy(ep).addScaledVector(_dnCamUp, R * 5.4).addScaledVector(_dnAlong, -R * 1.6)
   }
-  if (_bjWorld.lengthSq() < 1e-6) return
-  const dist = force ? 250 : Math.min(400, Math.max(160, camera.position.length()))
-  camera.position.copy(_bjWorld).normalize().multiplyScalar(dist)
-  controls.target.set(0, 0, 0)
-  camera.up.set(0, 1, 0)
-  camera.lookAt(0, 0, 0)
+
+  camera.position.copy(_dnCamPos)
+  controls.target.copy(_dnCamTarget)
+  controls.update()
+}
+
+function frameDayNight() {
+  applyDayNightView('overview')
 }
 
 function snapHour(h: number) {
   playing.value = false
   hour.value = h
-  applyBeijingTime()
-  frameBeijing(true)
+  syncDayNightScene()
 }
 
 function loopThree() {
@@ -1054,10 +1489,14 @@ function loopThree() {
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
 
-  if (threeMode === 'day-night' && globeRoot) {
-    if (playing.value) hour.value = (hour.value + dt * 0.7) % 24
-    applyBeijingTime()
-    if (playing.value || !userOrbiting) frameBeijing()
+  if (threeMode === 'day-night' && earthOrbitRoot) {
+    if (playing.value) {
+      const dHour = dt * 2.2
+      hour.value = (hour.value + dHour) % 24
+      // 课堂加速公转（真≈0.99°/日看不见）；自转仍按地方时准确
+      dnOrbitAngle.value += (dHour / 24) * ((ORBIT_TEACH_DEG_PER_DAY * Math.PI) / 180)
+    }
+    syncDayNightScene()
     if (camera && sunLookAt) sunLookAt(camera)
     controls?.update()
   } else if (threeMode === 'basics' && basicsSceneKind === 'period') {
@@ -1077,26 +1516,16 @@ function loopThree() {
     if (camera && sunLookAt) sunLookAt(camera)
     controls?.update()
   } else if (threeMode === 'basics' && globeRoot) {
-    if (playing.value) {
-      periodPhase = (periodPhase + dt * 0.12) % 1
-      globeRoot.rotation.y += dt * 0.35
-      periodAnim.value = periodPhase
-      if (latMarker && speedInfo.value.lat < 89.5) {
-        const R = 72
-        const φ = (speedInfo.value.lat * Math.PI) / 180
-        const y = Math.sin(φ) * R
-        const rr = Math.cos(φ) * R
-        const a0 = periodPhase * Math.PI * 2
-        const p = new THREE.Vector3(Math.sin(a0) * (rr + 2), y, Math.cos(a0) * (rr + 2))
-        latMarker.position.copy(p)
-        const tangent = new THREE.Vector3(Math.cos(a0), 0, -Math.sin(a0))
-        latMarker.lookAt(p.clone().add(tangent))
-        latMarker.rotateX(Math.PI / 2)
-      }
+    // 方向·速度：只转地球；纬圈定位标钉在球面上，随自转走（线速度由纬圈半径体现）
+    if (playing.value && basicsSceneKind === 'direction') {
+      globeRoot.rotation.y += dt * 0.28
     }
     controls?.update()
   } else if (threeMode === 'sphere') {
     updateSphereArrows(dt)
+    controls?.update()
+  } else if (threeMode === 'timezones') {
+    if (playing.value && globeRoot) globeRoot.rotation.y += dt * 0.08
     controls?.update()
   }
 
@@ -1132,8 +1561,8 @@ function setupSphereThrow() {
   controls.maxDistance = 480
   controls.target.set(0, 0, 0)
 
-  scene.add(new THREE.AmbientLight(0x445566, 0.4))
-  const sun = new THREE.DirectionalLight(0xfff2cc, 1.25)
+  scene.add(new THREE.AmbientLight(0x667788, 0.55))
+  const sun = new THREE.DirectionalLight(0xfff2cc, 1.1)
   sun.position.set(120, 60, 80)
   scene.add(sun)
 
@@ -1141,11 +1570,11 @@ function setupSphereThrow() {
   scene.add(globeRoot)
 
   const R = sphereR
-  const tex = new THREE.TextureLoader().load('/textures/earth-blue-marble.jpg')
+  const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
   tex.colorSpace = THREE.SRGBColorSpace
   globeRoot.add(
     addDisposable(
-      new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), new THREE.MeshPhongMaterial({ map: tex, shininess: 6 })),
+      new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), new THREE.MeshBasicMaterial({ map: tex })),
     ),
   )
 
@@ -1294,11 +1723,91 @@ function restartThrow() {
 }
 
 // ========== 俯视 SVG ==========
+/** 从赤道圆柱投影采样，生成极地→赤道正射圆盘（北：东在右；南：东在左） */
+function renderPolarMap(img: HTMLImageElement, pole: 'N' | 'S'): string {
+  const size = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const src = document.createElement('canvas')
+  src.width = img.naturalWidth || img.width
+  src.height = img.naturalHeight || img.height
+  const sctx = src.getContext('2d')!
+  sctx.drawImage(img, 0, 0)
+  const srcData = sctx.getImageData(0, 0, src.width, src.height)
+  const out = ctx.createImageData(size, size)
+  const cx = (size - 1) / 2
+  const rMax = size / 2 - 1.5
+  const sw = src.width
+  const sh = src.height
+
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const dx = px - cx
+      const dy = py - cx
+      const ρ = Math.hypot(dx, dy)
+      const oi = (py * size + px) * 4
+      if (ρ > rMax) {
+        out.data[oi + 3] = 0
+        continue
+      }
+      const colat = (ρ / rMax) * (Math.PI / 2)
+      // atan2(dx,dy)：底部为 0° 经线，顺时针为正（北半球俯视东在右）
+      const ang = Math.atan2(dx, dy)
+      let lat: number
+      let lon: number
+      if (pole === 'N') {
+        lat = 90 - (colat * 180) / Math.PI
+        lon = (ang * 180) / Math.PI
+      } else {
+        lat = -90 + (colat * 180) / Math.PI
+        // 南极俯视：东西对调，东在左
+        lon = (-ang * 180) / Math.PI
+      }
+      lon = ((((lon + 180) % 360) + 360) % 360) - 180
+      const u = ((lon + 180) / 360) * (sw - 1)
+      const v = ((90 - lat) / 180) * (sh - 1)
+      const ui = Math.max(0, Math.min(sw - 1, Math.round(u)))
+      const vi = Math.max(0, Math.min(sh - 1, Math.round(v)))
+      const si = (vi * sw + ui) * 4
+      out.data[oi] = srcData.data[si]!
+      out.data[oi + 1] = srcData.data[si + 1]!
+      out.data[oi + 2] = srcData.data[si + 2]!
+      out.data[oi + 3] = 255
+    }
+  }
+  ctx.putImageData(out, 0, 0)
+  return canvas.toDataURL('image/jpeg', 0.88)
+}
+
+function ensurePolarMaps() {
+  if (polarMapN && polarMapS) return
+  if (polarMapLoading) return
+  polarMapLoading = true
+  const img = new Image()
+  img.decoding = 'async'
+  img.onload = () => {
+    try {
+      polarMapN = renderPolarMap(img, 'N')
+      polarMapS = renderPolarMap(img, 'S')
+    } finally {
+      polarMapLoading = false
+      if (!topDisposed && coriolisMode.value === 'top') drawCoriolis()
+    }
+  }
+  img.onerror = () => {
+    polarMapLoading = false
+  }
+  img.src = '/textures/earth-period.jpg'
+}
+
 function startTopThrow() {
   teardownTop()
   topDisposed = false
   topThrowT.value = 0
   topLastT = performance.now()
+  ensurePolarMaps()
   topLoop()
 }
 
@@ -1343,6 +1852,7 @@ function drawCoriolis() {
       .attr('fill', color)
   }
 
+  // 回退色：贴图未就绪时用
   const radialN = defs.append('radialGradient').attr('id', 'er-disk-n')
   radialN.append('stop').attr('offset', '0%').attr('stop-color', '#1a4a6a')
   radialN.append('stop').attr('offset', '100%').attr('stop-color', '#0c2438')
@@ -1362,6 +1872,8 @@ function drawCoriolis() {
     resultLabel: coriolisOn.value ? '实际：右偏（向东）' : '实际：不偏转',
     verdict: coriolisOn.value ? '右偏' : '无偏',
     fill: 'url(#er-disk-n)',
+    mapUrl: polarMapN,
+    clipId: 'er-clip-n',
   })
 
   drawHemisphere(svg, {
@@ -1376,6 +1888,8 @@ function drawCoriolis() {
     resultLabel: coriolisOn.value ? '实际：左偏（向东）' : '实际：不偏转',
     verdict: coriolisOn.value ? '左偏' : '无偏',
     fill: 'url(#er-disk-s)',
+    mapUrl: polarMapS,
+    clipId: 'er-clip-s',
   })
 
   svg.append('line').attr('x1', 40).attr('y1', H - 28).attr('x2', 80).attr('y2', H - 28).attr('stroke', '#8aa0b4').attr('stroke-width', 2).attr('stroke-dasharray', '5 4')
@@ -1406,6 +1920,8 @@ function drawHemisphere(
     resultLabel: string
     verdict: string
     fill: string
+    mapUrl: string | null
+    clipId: string
   },
 ) {
   const r = 112
@@ -1414,12 +1930,42 @@ function drawHemisphere(
 
   svg.append('text').attr('x', cx).attr('y', 30).attr('text-anchor', 'middle').attr('fill', '#d8e4f0').attr('font-size', 12).attr('font-weight', 600).text(opt.title)
 
-  const disk = svg
+  const defs = svg.select('defs')
+  defs.append('clipPath').attr('id', opt.clipId).append('circle').attr('cx', cx).attr('cy', cy).attr('r', r)
+
+  // 底：真实极地地图（未加载时用渐变占位）
+  svg
     .append('circle')
     .attr('cx', cx)
     .attr('cy', cy)
     .attr('r', r)
     .attr('fill', opt.fill)
+  if (opt.mapUrl) {
+    svg
+      .append('image')
+      .attr('href', opt.mapUrl)
+      .attr('x', cx - r)
+      .attr('y', cy - r)
+      .attr('width', r * 2)
+      .attr('height', r * 2)
+      .attr('clip-path', `url(#${opt.clipId})`)
+      .attr('preserveAspectRatio', 'xMidYMid slice')
+    // 轻微压暗，让轨迹更清楚
+    svg
+      .append('circle')
+      .attr('cx', cx)
+      .attr('cy', cy)
+      .attr('r', r)
+      .attr('fill', '#061018')
+      .attr('opacity', 0.22)
+  }
+
+  const disk = svg
+    .append('circle')
+    .attr('cx', cx)
+    .attr('cy', cy)
+    .attr('r', r)
+    .attr('fill', 'transparent')
     .attr('stroke', '#4a90c8')
     .attr('stroke-width', 2)
     .style('cursor', 'pointer')
@@ -1430,14 +1976,14 @@ function drawHemisphere(
 
   // 纬线圈
   for (const f of [0.35, 0.62, 0.88]) {
-    svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r * f).attr('fill', 'none').attr('stroke', '#2a4a68').attr('stroke-width', 1).attr('opacity', 0.7)
+    svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r * f).attr('fill', 'none').attr('stroke', '#d8e8f8').attr('stroke-width', 1).attr('opacity', 0.35)
   }
-  svg.append('text').attr('x', cx).attr('y', cy + r - 12).attr('text-anchor', 'middle').attr('fill', '#6a849c').attr('font-size', 10).text('赤道')
+  svg.append('text').attr('x', cx).attr('y', cy + r - 12).attr('text-anchor', 'middle').attr('fill', '#e8f0f8').attr('font-size', 10).attr('font-weight', 600).text('赤道')
 
   const eastX = opt.eastOnRight ? cx + r - 14 : cx - r + 14
   const westX = opt.eastOnRight ? cx - r + 14 : cx + r - 14
-  svg.append('text').attr('x', eastX).attr('y', cy + 3).attr('text-anchor', 'middle').attr('fill', '#6a849c').attr('font-size', 10).text('东')
-  svg.append('text').attr('x', westX).attr('y', cy + 3).attr('text-anchor', 'middle').attr('fill', '#6a849c').attr('font-size', 10).text('西')
+  svg.append('text').attr('x', eastX).attr('y', cy + 3).attr('text-anchor', 'middle').attr('fill', '#e8f0f8').attr('font-size', 10).attr('font-weight', 600).text('东')
+  svg.append('text').attr('x', westX).attr('y', cy + 3).attr('text-anchor', 'middle').attr('fill', '#e8f0f8').attr('font-size', 10).attr('font-weight', 600).text('西')
 
   svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 4).attr('fill', '#ffe08a').attr('opacity', 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 500)))
   svg.append('text').attr('x', cx).attr('y', cy - 10).attr('text-anchor', 'middle').attr('fill', '#ffe08a').attr('font-size', 10).text('极')
@@ -1446,7 +1992,8 @@ function drawHemisphere(
   const span = 0.95
   const aStart = opt.clockwise ? -span : span
   const aEnd = opt.clockwise ? span : -span
-  const spinOff = ((performance.now() / 28) % 40) * (opt.clockwise ? 1 : -1)
+  // dashoffset 减小 → 虚线沿路径流向箭头端；南北路径方向已区分顺/逆，符号须一致
+  const spinOff = -((performance.now() / 28) % 40)
   svg
     .append('path')
     .attr('d', describeArc(cx, cy, spinR, aStart, aEnd, opt.clockwise))
@@ -1471,6 +2018,8 @@ function drawHemisphere(
   const y0 = cy + r - 10
   const x1 = cx
   const y1 = cy + 14
+  // 预定虚线流向极点（减小 dashoffset）；南北同一规则，避免南半球反着流
+  const intentOff = -((performance.now() / 36) % 22)
   svg
     .append('line')
     .attr('x1', x0)
@@ -1480,6 +2029,7 @@ function drawHemisphere(
     .attr('stroke', '#8aa0b4')
     .attr('stroke-width', 1.8)
     .attr('stroke-dasharray', '6 5')
+    .attr('stroke-dashoffset', intentOff)
     .attr('marker-end', 'url(#arr-intent)')
 
   svg.append('circle').attr('cx', x0).attr('cy', y0).attr('r', 6).attr('fill', '#5ec8f0').attr('stroke', '#fff').attr('stroke-width', 1.2)
@@ -1792,114 +2342,159 @@ function enterCoriolisMode(mode: CoriolisMode) {
   else requestAnimationFrame(() => setupSphereThrow())
 }
 
-function drawTimezones() {
-  const el = tzSvgRef.value
-  if (!el) return
-  const svg = d3.select(el)
-  svg.selectAll('*').remove()
+/** 时区：真实地球 + 理论时区经线（每 15°） */
+function setupTimezones() {
+  if (!initThreeCanvas('timezones') || !scene || !camera || !controls) return
+  const R = TZ_EARTH_R
 
-  const width = W
-  const height = H
-  svg.append('rect').attr('width', width).attr('height', height).attr('fill', '#080c12').attr('rx', 12)
-
-  const defs = svg.append('defs')
-  defs
-    .append('marker')
-    .attr('id', 'arr-east')
-    .attr('viewBox', '0 0 10 10')
-    .attr('refX', 8)
-    .attr('refY', 5)
-    .attr('markerWidth', 6)
-    .attr('markerHeight', 6)
-    .attr('orient', 'auto')
-    .append('path')
-    .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-    .attr('fill', '#6ec8f0')
-
-  const margin = { top: 36, right: 24, bottom: 56, left: 24 }
-  const bw = width - margin.left - margin.right
-  const bh = 120
-  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`)
-
-  // 时区带：-12 … +12，中央为 0
-  const zones = d3.range(-12, 13)
-  const x = d3.scaleBand<number>().domain(zones).range([0, bw]).paddingInner(0.04)
-
-  for (const z of zones) {
-    const isZero = z === 0
-    const isE8 = z === 8
-    const fill = isE8 ? 'rgba(255, 224, 138, 0.28)' : isZero ? 'rgba(94, 200, 240, 0.18)' : 'rgba(40, 70, 100, 0.45)'
-    g.append('rect')
-      .attr('x', x(z)!)
-      .attr('y', 0)
-      .attr('width', x.bandwidth())
-      .attr('height', bh)
-      .attr('fill', fill)
-      .attr('stroke', isE8 || isZero ? '#ffe08a' : '#2a4a68')
-      .attr('stroke-width', isE8 || isZero ? 1.5 : 0.6)
-    const label = z === 0 ? '中' : z > 0 ? `东${z}` : `西${Math.abs(z)}`
-    g.append('text')
-      .attr('x', x(z)! + x.bandwidth() / 2)
-      .attr('y', bh / 2 + 4)
-      .attr('text-anchor', 'middle')
-      .attr('fill', isE8 ? '#ffe08a' : '#9ec9e8')
-      .attr('font-size', 9)
-      .attr('font-weight', isE8 || isZero ? 600 : 400)
-      .text(z === 12 || z === -12 ? '东西十二' : label)
+  // Basic 贴图不受光照影响，避免夜半球被平行光打成全黑
+  if (sceneAmbient) {
+    sceneAmbient.color.set(0xffffff)
+    sceneAmbient.intensity = 0.55
+  }
+  if (sceneFill) {
+    sceneFill.intensity = 0
   }
 
-  svg
-    .append('text')
-    .attr('x', width / 2)
-    .attr('y', 22)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#d8e4f0')
-    .attr('font-size', 12)
-    .attr('font-weight', 600)
-    .text('理论时区（每 15°）· 教学示意')
+  globeRoot = new THREE.Group()
+  scene.add(globeRoot)
 
-  // 东加西减箭头
-  const ay = margin.top + bh + 28
-  svg
-    .append('line')
-    .attr('x1', margin.left + 40)
-    .attr('y1', ay)
-    .attr('x2', width - margin.right - 40)
-    .attr('y2', ay)
-    .attr('stroke', '#6ec8f0')
-    .attr('stroke-width', 2)
-    .attr('marker-end', 'url(#arr-east)')
-  svg.append('text').attr('x', width / 2).attr('y', ay - 8).attr('text-anchor', 'middle').attr('fill', '#6ec8f0').attr('font-size', 10).text('向东：区时更早（加） · 向西：区时更晚（减）')
+  const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
+  tex.colorSpace = THREE.SRGBColorSpace
+  globeRoot.add(
+    addDisposable(
+      new THREE.Mesh(new THREE.SphereGeometry(R, 72, 56), new THREE.MeshBasicMaterial({ map: tex })),
+    ),
+  )
 
-  // 城市对比卡
-  const cardY = ay + 24
-  const cardH = 150
-  const cardW = (width - margin.left - margin.right - 12) / 2
-  const cards = [
-    { city: tzA.value, local: tzALocal.value, zone: tzAZone.value, x: margin.left },
-    { city: tzB.value, local: tzBLocal.value, zone: tzBZone.value, x: margin.left + cardW + 12 },
+  // 夜半球半透明罩（随 UTC 转），压暗但不抹掉地图
+  const nightShell = new THREE.Mesh(
+    new THREE.SphereGeometry(R + 0.35, 56, 40, -Math.PI / 2, Math.PI),
+    new THREE.MeshBasicMaterial({
+      color: 0x020814,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  nightShell.name = 'tz-night'
+  globeRoot.add(addDisposable(nightShell))
+
+  // 赤道 + 本初子午（主框架）
+  globeRoot.add(addDisposable(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.85)))
+  globeRoot.add(addDisposable(makeEarthMeridian(0, R, EarthLineWidth.gridMajor, Demo3.earthPrime, 0.85)))
+  globeRoot.add(
+    addDisposable(makeLabelSprite('赤道', R * 0.55, 6, R * 0.75, { scale: 0.4, bg: false, color: DemoHex.earthEquator })),
+  )
+
+  // 时区边界：中心经线 offset×15 的西界 = offset×15 − 7.5
+  for (let offset = -11; offset <= 12; offset++) {
+    const centerLng = offset * 15
+    const westLng = centerLng - 7.5
+    const isCn = offset === 8 || offset === 9
+    const isZero = offset === 0 || offset === 1
+    const color = isCn ? 0xffd060 : isZero ? 0x6ec8f0 : 0xf0a020
+    const tube = isCn ? EarthLineWidth.bold : EarthLineWidth.mid
+    const op = isCn ? 0.95 : 0.75
+    globeRoot.add(addDisposable(makeEarthMeridian(westLng, R, tube, color, op)))
+
+    const label = offset === 0 ? 'UTC±0' : offset > 0 ? `UTC+${offset}` : `UTC${offset}`
+    const lp = latLonToVec(-16, centerLng, R + 6)
+    const spr = makeLabelSprite(label, lp.x, lp.y, lp.z, {
+      scale: offset === 0 || offset === 8 ? 0.48 : 0.32,
+      bg: offset === 0 || offset === 8,
+      color: offset === 0 ? '#6ec8f0' : offset === 8 ? '#ffe08a' : '#f0c878',
+    })
+    globeRoot.add(addDisposable(spr))
+  }
+
+  // 高亮界线旁注：蓝=中时区两侧，金=东八区两侧
+  {
+    const notes: { lon: number; text: string; color: string; lat: number }[] = [
+      { lon: -7.5, text: '中时区西界', color: '#6ec8f0', lat: 28 },
+      { lon: 7.5, text: '中时区东界', color: '#6ec8f0', lat: 28 },
+      { lon: 0, text: '本初子午', color: DemoHex.earthPrime, lat: 48 },
+      { lon: 112.5, text: '东八区西界', color: '#ffe08a', lat: 28 },
+      { lon: 127.5, text: '东八区东界', color: '#ffe08a', lat: 28 },
+    ]
+    for (const n of notes) {
+      const p = latLonToVec(n.lat, n.lon, R + 8)
+      globeRoot.add(
+        addDisposable(
+          makeLabelSprite(n.text, p.x, p.y, p.z, { scale: 0.4, bg: true, color: n.color }),
+        ),
+      )
+    }
+  }
+
+  tzSunLight = null
+
+  tzMarkerGroup = new THREE.Group()
+  globeRoot.add(tzMarkerGroup)
+
+  syncTimezoneMarkers()
+  syncTimezoneSun()
+  frameTimezoneCamera()
+
+  playing.value = true
+  lastT = performance.now()
+  loopThree()
+}
+
+/** 夜罩默认盖本地 -X；转到 UTC 背日经线，半透明压暗即可 */
+function syncTimezoneSun() {
+  if (!globeRoot) return
+  const night = globeRoot.getObjectByName('tz-night')
+  if (!night) return
+  const subLon = 15 * (12 - tzUtcHour.value)
+  const nightLon = subLon + 180
+  night.rotation.set(0, (nightLon * Math.PI) / 180, 0)
+}
+
+/** 镜头看向东八区（北京附近），保证首屏能看到地图与时区线 */
+function frameTimezoneCamera() {
+  if (!camera || !controls) return
+  const focus = latLonToVec(25, 110, TZ_EARTH_R * 2.8)
+  camera.position.copy(focus)
+  camera.up.set(0, 1, 0)
+  controls.target.set(0, 0, 0)
+  controls.update()
+}
+
+function syncTimezoneMarkers() {
+  if (!tzMarkerGroup || !globeRoot) return
+  while (tzMarkerGroup.children.length) {
+    const c = tzMarkerGroup.children[0]!
+    tzMarkerGroup.remove(c)
+    disposeObj(c)
+  }
+  const R = TZ_EARTH_R
+  const cities = [
+    { city: tzA.value, local: tzALocal.value, zone: tzAZone.value, color: 0x5ec8f0, tag: 'A' },
+    { city: tzB.value, local: tzBLocal.value, zone: tzBZone.value, color: 0xff9f43, tag: 'B' },
   ]
-  for (const card of cards) {
-    const cg = svg.append('g').attr('transform', `translate(${card.x},${cardY})`)
-    cg.append('rect').attr('width', cardW).attr('height', cardH).attr('rx', 10).attr('fill', 'rgba(16,24,36,0.92)').attr('stroke', 'rgba(76,201,240,0.25)')
-    cg.append('text').attr('x', 14).attr('y', 24).attr('fill', '#d8e4f0').attr('font-size', 12).attr('font-weight', 600).text(card.city.name)
-    cg.append('text').attr('x', 14).attr('y', 46).attr('fill', '#8aa0b4').attr('font-size', 10).text(`经度 ${card.city.lon}° · 时区 ${card.city.zone >= 0 ? '东' : '西'}${Math.abs(card.city.zone)}`)
-    cg.append('text').attr('x', 14).attr('y', 72).attr('fill', '#8aa0b4').attr('font-size', 10).text('地方时')
-    cg.append('text').attr('x', 14).attr('y', 94).attr('fill', '#5ec8f0').attr('font-size', 20).attr('font-weight', 600).text(card.local)
-    cg.append('text').attr('x', 14).attr('y', 118).attr('fill', '#8aa0b4').attr('font-size', 10).text('区时')
-    cg.append('text').attr('x', 14).attr('y', 140).attr('fill', '#ffe08a').attr('font-size', 20).attr('font-weight', 600).text(card.zone)
+  // 若 A/B 同城，只画一个点
+  const seen = new Set<string>()
+  for (const item of cities) {
+    if (seen.has(item.city.id)) continue
+    seen.add(item.city.id)
+    const p = latLonToVec(item.city.lat, item.city.lon, R + 1.6)
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(2.2, 14, 12),
+      new THREE.MeshBasicMaterial({ color: item.color }),
+    )
+    dot.position.copy(p)
+    tzMarkerGroup.add(dot)
+    const lp = latLonToVec(item.city.lat, item.city.lon, R + 12)
+    tzMarkerGroup.add(
+      makeLabelSprite(`${item.city.name} · 区时${item.zone}`, lp.x, lp.y, lp.z, {
+        scale: 0.48,
+        bg: true,
+        color: item.tag === 'A' ? '#9fe0f8' : '#ffc090',
+      }),
+    )
   }
-
-  // 北京时间辨析底栏
-  const bj = beijingLocalVsZone.value
-  svg
-    .append('text')
-    .attr('x', width / 2)
-    .attr('y', height - 14)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#ff9f43')
-    .attr('font-size', 10)
-    .text(`北京时间 = 东八区区时（120°E）≈ ${bj.zone}  ·  北京地方时（116.4°E）≈ ${bj.local}  ·  二者不同`)
 }
 
 function enterStep(id: string) {
@@ -1909,7 +2504,7 @@ function enterStep(id: string) {
   if (id === 'basics') requestAnimationFrame(() => setupBasics())
   else if (id === 'day-night') requestAnimationFrame(() => setupDayNight())
   else if (id === 'coriolis') enterCoriolisMode(coriolisMode.value)
-  else if (id === 'timezones') requestAnimationFrame(() => drawTimezones())
+  else if (id === 'timezones') requestAnimationFrame(() => setupTimezones())
 }
 
 watch(
@@ -1958,23 +2553,32 @@ watch(terminatorFocus, () => {
   if (threeMode === 'day-night') syncTerminatorFocus()
 })
 
+watch(hour, () => {
+  if (threeMode === 'day-night' && !playing.value) syncDayNightScene()
+})
+
 watch([tzCityA, tzCityB, tzUtcHour], () => {
-  if (props.stepId === 'timezones') drawTimezones()
+  if (threeMode !== 'timezones') return
+  syncTimezoneMarkers()
+  syncTimezoneSun()
 })
 
 function onResize() {
   if (!wrapRef.value) return
   const w = wrapRef.value.clientWidth
   const h = Math.max(280, wrapRef.value.clientHeight - 48)
-  if (isDayNight.value || isBasics.value || (isCoriolis.value && coriolisMode.value === 'sphere')) {
+  if (
+    isDayNight.value ||
+    isBasics.value ||
+    isTimezones.value ||
+    (isCoriolis.value && coriolisMode.value === 'sphere')
+  ) {
     if (!renderer || !camera) return
     camera.aspect = w / h
     camera.updateProjectionMatrix()
     renderer.setSize(w, h, false)
   } else if (isCoriolis.value && coriolisMode.value === 'fp') {
     resizeFp()
-  } else if (isTimezones.value) {
-    drawTimezones()
   }
 }
 
@@ -2067,8 +2671,19 @@ onUnmounted(() => {
           <button type="button" :class="{ on: terminatorFocus === 'dusk' }" @click="terminatorFocus = 'dusk'">昏线</button>
         </div>
         <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-          {{ playing ? '暂停自转' : '继续自转' }}
+          {{ playing ? '暂停' : '播放自转+公转' }}
         </button>
+        <div class="mode-tabs">
+          <button
+            v-for="v in DN_CAM_VIEWS"
+            :key="v.id"
+            type="button"
+            :class="{ on: dnCamView === v.id }"
+            @click="applyDayNightView(v.id)"
+          >
+            {{ v.label }}
+          </button>
+        </div>
       </template>
 
       <template v-else-if="isCoriolis">
@@ -2124,7 +2739,10 @@ onUnmounted(() => {
             {{ c.name }}
           </button>
         </div>
-        <span class="note">东加西减 · 15°≈1 时区</span>
+        <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
+          {{ playing ? '暂停自转' : '慢速自转' }}
+        </button>
+        <span class="note">橙线=时区界 · 东加西减 · 15°≈1h · 拖转地球</span>
       </template>
     </div>
 
@@ -2154,17 +2772,45 @@ onUnmounted(() => {
           <p v-if="periodKind !== 'solar'"><em>恒星日</em>360° · 23h56m · 对准恒星</p>
           <p v-if="periodKind !== 'sidereal'"><em>太阳日</em>360°+α · 24h · 对准太阳</p>
         </div>
-        <p class="hud-hint">α={{ PERIOD_ORBIT_TEACH_DEG }}°示意（真≈{{ PERIOD_SOLAR_EXTRA_DEG.toFixed(2) }}°）· 青线∥恒星 · 橙线→太阳</p>
+        <p class="hud-hint">
+          α={{ PERIOD_ORBIT_TEACH_DEG }}°示意（真≈{{ PERIOD_SOLAR_EXTRA_DEG.toFixed(2) }}°/日）· 灰线：太阳→起/恒/太 · 橙线：当前地球→太阳
+        </p>
       </aside>
     </div>
 
     <div v-else-if="isDayNight" class="stage">
       <canvas ref="canvasRef" class="globe" />
       <aside class="hud hud-wide">
-        <p class="hud-title">{{ BEIJING.name }}</p>
-        <p class="hud-time">{{ localLabel }}</p>
-        <p class="hud-phase">{{ dayPhase }} · 地方时</p>
-        <p class="hud-hint">形成：球体不透明不发光 · 交替：自转 · 晨昏线相对地表自东向西</p>
+        <p class="hud-title">{{ BEIJING.name }} · {{ localLabel }}</p>
+        <p class="hud-row"><span>自转</span><strong>{{ dayPhase }} · 地方时对准太阳</strong></p>
+        <p class="hud-row"><span>公转</span><strong>{{ dnOrbitDeg.toFixed(1) }}°</strong></p>
+        <p class="hud-phase">
+          公转示意 {{ ORBIT_TEACH_DEG_PER_DAY }}°/日（真≈{{ ORBIT_TRUE_DEG_PER_DAY.toFixed(2) }}°）· 地轴定向不变
+        </p>
+        <p class="hud-hint">可拖转/滚轮缩放/右键平移 · 太阳居中 · 晨昏⊥日地连线</p>
+      </aside>
+    </div>
+
+    <div v-else-if="isTimezones" class="stage">
+      <canvas ref="canvasRef" class="globe" />
+      <aside class="hud hud-wide">
+        <p class="hud-title">理论时区 · 每 15°</p>
+        <p class="hud-row">
+          <span>{{ tzA.name }} 地方时</span><strong>{{ tzALocal }}</strong>
+        </p>
+        <p class="hud-row">
+          <span>{{ tzA.name }} 区时</span><strong>{{ tzAZone }}</strong>
+        </p>
+        <p class="hud-row">
+          <span>{{ tzB.name }} 地方时</span><strong>{{ tzBLocal }}</strong>
+        </p>
+        <p class="hud-row">
+          <span>{{ tzB.name }} 区时</span><strong>{{ tzBZone }}</strong>
+        </p>
+        <p class="hud-phase">
+          北京时间=东八区≈{{ beijingLocalVsZone.zone }} · 北京地方时≈{{ beijingLocalVsZone.local }}
+        </p>
+        <p class="hud-hint">蓝线=中时区（UTC±0）两侧界 · 金线=东八区两侧界 · 橙线=其余时区界</p>
       </aside>
     </div>
 
@@ -2177,14 +2823,6 @@ onUnmounted(() => {
     />
     <canvas v-show="isCoriolis && coriolisMode === 'fp'" ref="fpCanvasRef" class="globe" />
     <canvas v-show="isCoriolis && coriolisMode === 'sphere'" ref="sphereCanvasRef" class="globe" />
-
-    <svg
-      v-show="isTimezones"
-      ref="tzSvgRef"
-      class="canvas"
-      :viewBox="`0 0 ${W} ${H}`"
-      preserveAspectRatio="xMidYMid meet"
-    />
   </div>
 </template>
 

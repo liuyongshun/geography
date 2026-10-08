@@ -67,6 +67,27 @@ alwaysApply: false
 4. 岩石等地表材质：ambientCG 等 CC0 1K Color；角标写「示意 · 非鉴定」。
 5. 新范式或新贴图来源写入 `docs/developing-dili.md`（见 `docs-sync.mdc`）。
 
+## 地球示意线（经纬网 / 晨昏 / 地轴）
+
+参考 NASA / earth-clock。色与管径写在 `theme.ts`（`DemoHex.earth*`、`EarthLineWidth` / `GlobeGridWidth`），禁止课内再散落硬编码。Globe 经纬网图层与 Demo 晨昏课共用此表。
+
+| 语义 | 色 | 管径 | 线型 | 备注 |
+|------|----|------|------|------|
+| 地轴 | `earthAxis` 青 | `axis` | **实线** | 细杆 + 小锥；标 N/S |
+| 次要经纬网 | `earthGrid` 暗青 | `grid` | **实线** | 每 30°，低对比 |
+| 赤道 | `earthEquator` 绿青 | `gridMajor` | **实线** | 最醒目纬线 |
+| 本初子午线 | `earthPrime` 亮青 | `gridMajor` | **实线** | 180° 可同级实线 |
+| 南北回归线 | `earthTropic` 沙金 | `special` | **虚线** | ±23.5°，与赤道区分 |
+| 南北极圈 | `earthPolar` 灰蓝 | `special` | **虚线** | ±66.5° |
+| 晨昏线 | `earthTerminator` 沙金 | `mid`+`soft` | **实线** | 软边黄昏带 |
+| 晨 / 昏弧 | `earthDawn`/`earthDusk` | `bold` | **实线** | 冷蓝 / 暖橙 |
+| 自转方向 | `earthSpin` | `thin` | **实线**+锥箭头 | 必须可见箭头 |
+| 城市锚点 | `earthMarker` | — | — | 点 + 细环 |
+
+口诀：**主框架实线，特殊纬线虚线**（见 `EarthLineStroke` / `EarthDashDeg`）。
+
+Three.js：`LineBasicMaterial.linewidth` 多数平台无效，**用 Tube / Torus 管径**；虚线用分段 Tube（`makeGlobeDashedParallel`）。
+
 ## 字体与字号
 
 画布内文字宜**克制、偏小**，避免地名/要素标签压过示意图。

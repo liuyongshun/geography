@@ -70,6 +70,8 @@ npm run build:countries  # 重建 public/geo/countries-teach.json
 | `earth-blue-marble.jpg` | 地球日景底图 | 教学用卫星真彩底图（NASA Blue Marble 系公开影像常见衍生）；课堂示意 |
 | `earth-night.jpg` | 夜光 / 昼夜对照 | 教学用夜光示意贴图 |
 | `earth-topology.png` | 地形 bump | 教学用起伏示意 |
+| `earth-period.jpg` | 恒星日/太阳日、地转偏向、时区、公转/五带示意球 | NASA Visible Earth **land_shallow_topo_2048**（陆地浅海地形真彩），公有领域；见 `earth-period-disclaimer.json` |
+| `earth-period-disclaimer.json` | 上项声明 | 课堂示意 · 非测绘依据 |
 | `sun-hmi.jpg` | 太阳表面（日面 billboard） | NASA SDO **AIA 171Å** 1024px（`latest_1024_0171.jpg`），公有领域；经 `sunVisual` 抠黑底并提对比（文件名历史原因仍为 sun-hmi） |
 | `sun-disclaimer.json` | 太阳贴图声明 | 非观测预报 |
 | `rocks/lava-color.jpg` | 熔岩观感 | ambientCG **Lava001**，**CC0** |
@@ -213,6 +215,7 @@ src-tauri/               桌面壳
 - 数据源：`src/demos/theme.ts`（`DemoHex` 字符串 / `Demo3` 整数）。
 - CSS：`src/styles/global.css` 的 `--demo-*`、壳层「墨蓝观测台」主色。
 - 画布字号宜小（角标约 10px，要素名 10～12px）。
+- **地球示意线**：`DemoHex.earth*` / `EarthLineWidth` / `EarthLineStroke`（实线 vs 虚线）/ `EarthDashDeg`。口诀：**主框架实线，特殊纬线虚线**（回归线、极圈虚线；赤道/经纬网/晨昏实线）。Three 用 Tube/Torus；虚线分段 Tube。样板：`earth-rotation` 晨昏、`layers/latlon.ts`。
 
 ---
 

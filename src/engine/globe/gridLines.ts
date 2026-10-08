@@ -22,6 +22,31 @@ export function makeGlobeTube(
   return new THREE.Mesh(geo, mat)
 }
 
+/** 虚线纬圈：按经度分段 Tube（dash/gap 单位为度） */
+export function makeGlobeDashedParallel(
+  lat: number,
+  tubeRadius: number,
+  color: number,
+  opacity: number,
+  dashDeg: number,
+  gapDeg: number,
+  clippingPlanes: THREE.Plane[] = [],
+  relAlt = 0.018,
+): THREE.Group {
+  const group = new THREE.Group()
+  const step = Math.max(2, Math.floor(dashDeg / 3))
+  for (let lon0 = -180; lon0 < 180; lon0 += dashDeg + gapDeg) {
+    const pts: THREE.Vector3[] = []
+    for (let lon = lon0; lon <= lon0 + dashDeg; lon += step) {
+      const p = geoPosition(lat, lon, relAlt)
+      pts.push(new THREE.Vector3(p.x, p.y, p.z))
+    }
+    if (pts.length < 2) continue
+    group.add(makeGlobeTube(pts, tubeRadius, color, opacity, clippingPlanes))
+  }
+  return group
+}
+
 /** 经线：固定 lng，lat 从南到北 */
 export function meridianPoints(lng: number, relAlt = 0.018, step = 3): THREE.Vector3[] {
   const pts: THREE.Vector3[] = []

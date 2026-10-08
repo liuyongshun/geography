@@ -61,6 +61,17 @@
   --demo-accent: #4aa3d9;
   --demo-accent-soft: #c5e4f6;
   --demo-accent-on: rgba(74, 163, 217, 0.14);
+  /* 地球示意线（与 theme.ts Earth* 同源） */
+  --demo-earth-axis: #6ec8f0;
+  --demo-earth-grid: #3d6a88;
+  --demo-earth-grid-major: #b8f0ff;
+  --demo-earth-equator: #7dd3a0;
+  --demo-earth-prime: #c5f4ff;
+  --demo-earth-tropic: #e8b84a;
+  --demo-earth-polar: #a8c0d8;
+  --demo-earth-terminator: #f0d078;
+  --demo-earth-dawn: #5eb4e8;
+  --demo-earth-dusk: #e08a5a;
 
   --r-sm: 6px;
   --r-md: 10px;

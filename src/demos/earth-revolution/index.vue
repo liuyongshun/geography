@@ -55,8 +55,8 @@ const stepTitle = computed(() => {
 })
 const stepHint = computed(() => {
   if (props.stepId === 'tilt') return '黄道面与赤道面的夹角 · 播放时 0°↔23.5° 往复 · 平行光流动'
-  if (props.stepId === 'subsolar') return '直射点随月份在南北回归线间往返'
-  return seasonName.value
+  if (props.stepId === 'subsolar') return '直射点始终在向日面 · 随月份在南北回归线间往返'
+  return `${seasonName.value} · 色带为五带 · 高亮=选中/有直射`
 })
 
 let renderer: THREE.WebGLRenderer | null = null
@@ -110,11 +110,18 @@ function disposeObj(obj: THREE.Object3D) {
   }
 }
 
+/**
+ * 本场景约定：太阳在 -X，向日经线 = −90°。
+ * x = cosφ·sinλ，y = sinφ，z = cosφ·cosλ
+ */
 function latLonToVec(lat: number, lon: number, r: number) {
   const φ = (lat * Math.PI) / 180
   const λ = (lon * Math.PI) / 180
   return new THREE.Vector3(Math.cos(φ) * Math.sin(λ), Math.sin(φ), Math.cos(φ) * Math.cos(λ)).multiplyScalar(r)
 }
+
+/** 向日经线（对准 -X 太阳） */
+const SUN_FACING_LON = -90
 
 function makeLabel(text: string, scale = 0.75) {
   const canvas = document.createElement('canvas')
@@ -269,22 +276,25 @@ function setupScene() {
     )
   }
 
-  scene.add(new THREE.AmbientLight(0x223344, 0.4))
-  sunLight = new THREE.DirectionalLight(0xfff1d0, 1.5)
-  sunLight.position.set(-220, 0, 40)
+  scene.add(new THREE.AmbientLight(0x4a5a6c, 0.55))
+  sunLight = new THREE.DirectionalLight(0xfff1d0, 2.0)
+  sunLight.position.set(-220, 0, 0)
   scene.add(sunLight)
-  const fill = new THREE.DirectionalLight(0x4a6a90, 0.22)
-  fill.position.set(120, 40, 80)
+  scene.add(sunLight.target)
+  sunLight.target.position.set(0, 0, 0)
+  const fill = new THREE.DirectionalLight(0x4a6a90, 0.18)
+  fill.position.set(80, 40, 100)
   scene.add(fill)
 
-  // 太阳：SDO/AIA 日面
+  // 太阳：SDO/AIA 日面（−X）
   const sunRoot = new THREE.Group()
   sunRoot.position.set(-210, 0, 0)
   const sunVis = makeSunBillboard(18)
   sunLookAt = sunVis.lookAt
   sunRoot.add(addDisposable(sunVis.group))
-  sunRoot.add(addDisposable(makeLabel('太阳', 0.7)))
-  sunRoot.children[sunRoot.children.length - 1]!.position.set(0, -28, 0)
+  const sunLab = makeLabel('太阳', 0.7)
+  sunLab.position.set(0, -28, 0)
+  sunRoot.add(addDisposable(sunLab))
   scene.add(sunRoot)
   sunMesh = sunRoot
 
@@ -365,20 +375,14 @@ function setupScene() {
   earthGroup.add(earthSpinRoot)
   scene.add(earthGroup)
 
-  const loader = new THREE.TextureLoader()
-  const dayTex = loader.load('/textures/earth-blue-marble.jpg')
+  const dayTex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
   dayTex.colorSpace = THREE.SRGBColorSpace
-  const nightTex = loader.load('/textures/earth-night.jpg')
-  nightTex.colorSpace = THREE.SRGBColorSpace
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(R, 72, 56),
     new THREE.MeshPhongMaterial({
       map: dayTex,
-      emissiveMap: nightTex,
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.45,
-      shininess: 10,
-      specular: new THREE.Color(0x335566),
+      shininess: 12,
+      specular: new THREE.Color(0x223344),
     }),
   )
   earthSpinRoot.add(addDisposable(earth))
@@ -420,37 +424,55 @@ function setupScene() {
   eqLab.position.copy(latLonToVec(0, 40, R + 14))
   earthSpinRoot.add(addDisposable(eqLab))
 
-  // 回归线 / 极圈
-  for (const [lat, col] of [
-    [23.5, 0xe8b84a],
-    [-23.5, 0xe8b84a],
-    [66.5, 0xa8c0d8],
-    [-66.5, 0xa8c0d8],
+  // 回归线 / 极圈 + 注记（挂倾斜层，不随自转跑到背面语义错乱）
+  for (const [lat, col, name] of [
+    [23.5, 0xe8b84a, '北回归线'],
+    [-23.5, 0xe8b84a, '南回归线'],
+    [66.5, 0xa8c0d8, '北极圈'],
+    [-66.5, 0xa8c0d8, '南极圈'],
   ] as const) {
-    earthSpinRoot.add(addDisposable(makeLatCircle(lat, R + 0.6, col, 0.55)))
+    earthGroup.add(addDisposable(makeLatCircle(lat, R + 0.6, col, 0.7)))
+    const lab = makeLabel(name, 0.48)
+    lab.position.copy(latLonToVec(lat, SUN_FACING_LON + 25, R + 10))
+    earthGroup.add(addDisposable(lab))
   }
 
-  // 直射点
+  // 直射点：挂在倾斜层（earthGroup），始终在向日经线，绝不随自转到夜半球
   subsolarDot = new THREE.Mesh(
-    new THREE.SphereGeometry(2.4, 14, 12),
+    new THREE.SphereGeometry(2.8, 14, 12),
     new THREE.MeshBasicMaterial({ color: 0xffeb3b }),
   )
-  earthSpinRoot.add(addDisposable(subsolarDot))
+  earthGroup.add(addDisposable(subsolarDot))
+  const subLab = makeLabel('直射点', 0.55)
+  subLab.name = 'subsolar-label'
+  earthGroup.add(addDisposable(subLab))
 
-  // 阳光束（世界坐标，从太阳到直射点）
+  // 阳光束 + 锥箭头（世界坐标）
   rayBeam = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-    new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.85 }),
+    new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9 }),
   )
   scene.add(addDisposable(rayBeam))
+  const rayCone = new THREE.Mesh(
+    new THREE.ConeGeometry(2.2, 7, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffe08a }),
+  )
+  rayCone.name = 'ray-cone'
+  scene.add(addDisposable(rayCone))
 
-  // 五带半透明壳
+  // 五带半透明壳：纬带对称，挂倾斜层即可
   bandGroup = new THREE.Group()
-  earthSpinRoot.add(bandGroup)
+  earthGroup.add(bandGroup)
   for (const b of BANDS) {
     const mesh = makeBandMesh(b.y0, b.y1, R, b.color, 0.0)
     mesh.userData.bandId = b.id
     bandGroup.add(addDisposable(mesh))
+    const midLat = (b.y0 + b.y1) / 2
+    const lab = makeLabel(b.name, 0.5)
+    lab.userData.bandId = b.id
+    lab.userData.kind = 'band-label'
+    lab.position.copy(latLonToVec(midLat, SUN_FACING_LON + 40, R + 14))
+    bandGroup.add(addDisposable(lab))
   }
 
   tiltAnim = tiltOn.value ? 1 : 0
@@ -490,18 +512,42 @@ function applyStepCamera() {
 function updateOverlays() {
   if (!earthGroup || !earthSpinRoot || !subsolarDot || !rayBeam || !bandGroup || !sunMesh) return
   const lat = subsolar.value
-  const local = latLonToVec(lat, -20, R + 1.5)
+  // 始终钉在向日经线；只随月份改纬度，不随自转跑到夜半球
+  const local = latLonToVec(lat, SUN_FACING_LON, R + 1.8)
   subsolarDot.position.copy(local)
-  subsolarDot.visible = props.stepId !== 'tilt'
+  const showSub = props.stepId !== 'tilt'
+  subsolarDot.visible = showSub
+  const subLab = earthGroup.getObjectByName('subsolar-label')
+  if (subLab) {
+    subLab.position.copy(latLonToVec(lat, SUN_FACING_LON, R + 12))
+    subLab.visible = showSub
+  }
 
+  earthGroup.updateMatrixWorld(true)
   const worldHit = local.clone()
-  earthSpinRoot.localToWorld(worldHit)
+  earthGroup.localToWorld(worldHit)
   const sunPos = sunMesh.position.clone()
+  const from = sunPos.clone().add(new THREE.Vector3(22, 0, 0))
   const positions = rayBeam.geometry.attributes.position as THREE.BufferAttribute
-  positions.setXYZ(0, sunPos.x + 18, sunPos.y, sunPos.z)
+  positions.setXYZ(0, from.x, from.y, from.z)
   positions.setXYZ(1, worldHit.x, worldHit.y, worldHit.z)
   positions.needsUpdate = true
-  rayBeam.visible = props.stepId !== 'tilt'
+  rayBeam.geometry.computeBoundingSphere()
+  rayBeam.visible = showSub
+
+  const cone = scene?.getObjectByName('ray-cone') as THREE.Mesh | null
+  if (cone) {
+    cone.visible = showSub
+    if (showSub) {
+      const dir = worldHit.clone().sub(from)
+      if (dir.lengthSq() > 1e-6) {
+        dir.normalize()
+        cone.position.copy(worldHit).addScaledVector(dir, -5)
+        cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+      }
+    }
+  }
+
   if (rayGroup) rayGroup.visible = props.stepId === 'tilt'
   if (normalAxis) normalAxis.visible = props.stepId === 'tilt'
 
@@ -510,10 +556,18 @@ function updateOverlays() {
   if (showBands) {
     for (const child of bandGroup.children) {
       const id = child.userData.bandId as number
-      const mat = (child as THREE.Mesh).material as THREE.MeshBasicMaterial
       const on = id === bandHi.value
-      const inSun = lat <= BANDS[id]!.y0 && lat >= BANDS[id]!.y1
-      mat.opacity = on ? 0.45 : inSun ? 0.28 : 0.12
+      const band = BANDS[id]
+      if (!band) continue
+      const inSun = lat <= band.y0 && lat >= band.y1
+      if (child.userData.kind === 'band-label') {
+        child.visible = on || inSun
+        continue
+      }
+      if (child instanceof THREE.Mesh) {
+        const mat = child.material as THREE.MeshBasicMaterial
+        mat.opacity = on ? 0.5 : inSun ? 0.32 : 0.14
+      }
     }
   }
 
@@ -597,7 +651,8 @@ function loop() {
         applyTilt()
       }
     }
-    if (earthSpinRoot) earthSpinRoot.rotation.y += dt * 0.35
+    // 黄赤交角课：慢转看地表即可
+    if (earthSpinRoot) earthSpinRoot.rotation.y += dt * 0.25
     if (rayGroup) {
       rayPhase += dt * 2.2
       const slide = (rayPhase * 14) % 22
@@ -637,7 +692,9 @@ function loop() {
       tiltAnim = target
       applyTilt()
     }
-    if (earthSpinRoot) earthSpinRoot.rotation.y += dt * 0.15
+    // 直射/五带：地表可慢转，直射点已钉在向日面，光线不会甩到背面
+    if (earthSpinRoot && props.stepId === 'seasons') earthSpinRoot.rotation.y += dt * 0.08
+    // 直射点课步不自转，避免干扰「纬度往返」观察
   }
 
   updateOverlays()
@@ -748,7 +805,14 @@ onUnmounted(() => {
         <p class="hud-title">{{ stepTitle }}</p>
         <p class="hud-desc">{{ stepHint }}</p>
         <p v-if="stepId === 'tilt'" class="hud-desc">当前交角 {{ tiltDegShow.toFixed(1) }}°</p>
-        <p v-if="stepId === 'seasons'" class="hud-desc">选中：{{ BANDS[bandHi]?.name }} · {{ BANDS[bandHi]?.note }}</p>
+        <p v-if="stepId === 'seasons'" class="hud-desc">
+          选中：{{ BANDS[bandHi]?.name }} · {{ BANDS[bandHi]?.note }}
+        </p>
+        <p v-if="stepId === 'seasons'" class="hud-desc">
+          直射 {{ subsolar >= 0 ? 'N' : 'S' }}{{ Math.abs(subsolar).toFixed(1) }}° ·
+          落在{{ BANDS.find((b) => subsolar <= b.y0 && subsolar >= b.y1)?.name ?? '—' }}
+        </p>
+        <p v-if="stepId === 'subsolar'" class="hud-desc">黄线=阳光 · 黄点=直射点（钉在向日面）</p>
       </aside>
       <svg v-show="stepId === 'subsolar'" ref="plotRef" class="plot" />
       <div v-if="stepId === 'seasons'" class="bands">
