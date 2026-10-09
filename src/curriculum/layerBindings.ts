@@ -33,7 +33,7 @@ export const TUTORIAL_LAYER_BINDINGS: Record<string, LayerId[]> = {
   'seawater-motion': ['latlon', 'degrees', 'sst', 'cities'],
   'ocean-human': ['cities', 'countries', 'sst', 'chlorophyll'],
   'ocean-currents': ['oceanCurrents', 'sst'],
-  'air-sea': ['sst', 'oceanCurrents', 'sun'],
+  'air-sea': ['enso', 'countries', 'sun'],
   'inland-water': ['rivers', 'cities', 'precip'],
 
   // 植被土壤

@@ -42,6 +42,7 @@ export class RiversLayer implements GlobeLayer {
 - **互斥 Tag** 写在 `layerConflicts.ts` 的 `LAYER_MUTEX_GROUPS`；开启一侧会自动关闭同组其它层并提示。新增会互相盖住/语义打架的层时务必登记。
 - GIBS 专题贴图经 `gibs.ts` 拉取并与底图合成；勿直接把 WMS URL 塞给 TextureLoader（MIME 常误标）。
 - 「实况风场」与「大气环流」互斥：前者 Open-Meteo 格点，后者教材示意粒子。
+- **ENSO / 沃克环流**（`enso`）：示意层，不占表面贴图；年景用 `GlobeFrameState.ensoMode`（`normal` | `elnino` | `lanina`）驱动暖池迁移与信风；海气课绑定见 `layerBindings`。
 - 中文注记用 Canvas Sprite（`labels.ts`）；`three-globe` 自带字体不含汉字。
 - 拾取返回 `GlobePick`（`belt` | `city`），城市优先于气压带。
 - `sticky: true` 仅地球底图；`stub: true` 表示占位未实现。

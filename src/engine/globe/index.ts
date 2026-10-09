@@ -7,6 +7,7 @@ export type {
   GlobeContext,
   GlobePick,
   GlobePickCity,
+  EnsoMode,
 } from './types'
 export { GLOBE_R } from './types'
 export { LAYER_CATALOG, toggleableLayers, layerMeta, defaultLayerMap } from './catalog'

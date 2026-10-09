@@ -19,6 +19,7 @@ import { TerminatorLayer } from './layers/terminator'
 import { EarthquakesLayer } from './layers/earthquakes'
 import { WindFieldLayer } from './layers/windfield'
 import { OceanCurrentsLayer } from './layers/oceanCurrents'
+import { EnsoLayer } from './layers/enso'
 import {
   NightLightsLayer,
   SstLayer,
@@ -139,6 +140,7 @@ export class GlobeHost {
       new CitiesLayer(),
       new RiversLayer(),
       new OceanCurrentsLayer(),
+      new EnsoLayer(),
       new PlatesLayer(),
       new EarthquakesLayer(),
       new PressureLayer(),
@@ -216,12 +218,16 @@ export class GlobeHost {
       this.keyLight.intensity = 1.25
     }
 
-    // 打开国家政区时对准东亚，便于核对方位
-    if (this.state.layers.countries && !this.framed) {
-      this.frameEastAsia()
-      this.framed = true
+    // 首次对准：ENSO 优先看赤道太平洋，否则政区看东亚
+    if (!this.framed) {
+      if (this.state.layers.enso) {
+        this.framePacific()
+      } else if (this.state.layers.countries) {
+        this.frameEastAsia()
+        this.framed = true
+      }
     }
-    if (!this.state.layers.countries) this.framed = false
+    if (!this.state.layers.countries && !this.state.layers.enso) this.framed = false
   }
 
   setLayer(id: LayerId, on: boolean) {
@@ -248,10 +254,21 @@ export class GlobeHost {
   }
 
   private frameEastAsia() {
-    const p = geoPosition(28, 110, 2.2)
+    this.frameGeo(28, 110, 2.2)
+  }
+
+  /** 将镜头对准某地理点（relAlt 为相机相对球半径的高度倍数） */
+  frameGeo(lat: number, lng: number, relAlt = 2.2) {
+    const p = geoPosition(lat, lng, relAlt)
     this.camera.position.set(p.x, p.y, p.z)
     this.controls.target.set(0, 0, 0)
     this.controls.update()
+  }
+
+  /** 赤道太平洋（ENSO / 沃克环流） */
+  framePacific() {
+    this.frameGeo(2, -160, 2.35)
+    this.framed = true
   }
 
   private loop = () => {
@@ -281,6 +298,7 @@ export class GlobeHost {
       'circulation',
       'windfield',
       'oceanCurrents',
+      'enso',
       'countries',
       'rivers',
       'plates',

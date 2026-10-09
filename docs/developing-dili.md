@@ -32,7 +32,7 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 
 | 场景 | 选型 |
 |------|------|
-| 3D 地球、气压带、洋流、直射点等 | Three.js + `three-globe`（`GlobeHost` + 可插拔图层） |
+| 3D 地球、气压带、洋流、ENSO/沃克环流、直射点等 | Three.js + `three-globe`（`GlobeHost` + 可插拔图层） |
 | 过程时间线 / 锋面剖面 / 火山成岩等微场景 | Three.js 自建场景（可 OrbitControls） |
 | 循环图式、类型卡片、地带谱等 2D 示意 | D3 / 手写 SVG |
 | 区域填色、线路、一带一路、产业转移 | MapLibre GL |
@@ -207,6 +207,8 @@ src-tauri/               桌面壳
 5. 需要时：`layerConflicts.ts` 互斥组；`layerBindings.ts` 绑课
 
 本地教学 GeoJSON 优先 `public/geo/*-teach.json`。
+
+样板：`layers/enso.ts`（赤道太平洋暖池 / 信风 / 沃克环流；`GlobeFrameState.ensoMode` 切换正常年·厄尔尼诺·拉尼娜；DemoLab `air-sea` 为地球主视 + 右侧斜温层剖面）。
 
 ---
 

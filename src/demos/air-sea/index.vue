@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as d3 from 'd3'
+import { GlobeHost, defaultLayerMap, type EnsoMode, type LayerId } from '@/engine/globe'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
 import { DemoHex } from '@/demos/theme'
 
@@ -9,75 +10,80 @@ const props = defineProps<{
   demo: DemoEntry
 }>()
 
+const wrapRef = ref<HTMLElement>()
+const canvasRef = ref<HTMLCanvasElement>()
 const svgRef = ref<SVGSVGElement | null>(null)
-const W = 780
-const H = 440
 
-type Mode = 'normal' | 'elnino' | 'lanina'
+const SW = 320
+const SH = 420
 
 interface ModeState {
   title: string
-  subtitle: string
+  slogan: string
   trade: number
   warmCenter: number
   thermoTilt: number
   westRain: number
   eastRain: number
   upwelling: number
+  fish: number
   westImpact: string
   eastImpact: string
+  steps: [string, string, string]
 }
 
-const MODE_META: Record<Mode, ModeState> = {
+const MODE_META: Record<EnsoMode, ModeState> = {
   normal: {
     title: '正常年 · 沃克环流',
-    subtitle: '西暖东冷，信风把暖水吹向西太平洋',
+    slogan: '信风把热水吹到西边 → 印尼多雨 · 秘鲁渔场旺',
     trade: 1,
     warmCenter: 0.22,
     thermoTilt: 1,
     westRain: 1,
-    eastRain: 0,
-    upwelling: 0.75,
-    westImpact: '印尼 / 澳北：多雨',
-    eastImpact: '秘鲁沿岸：上升流渔场',
+    eastRain: 0.06,
+    upwelling: 0.9,
+    fish: 1,
+    westImpact: '印尼 / 澳北：湿热多雨',
+    eastImpact: '秘鲁：冷水上升 · 渔场旺',
+    steps: ['信风把海表热水往西吹', '热水堆在西边，上升成云下雨', '东边冷水涌上，鱼群聚集'],
   },
   elnino: {
-    title: '厄尔尼诺',
-    subtitle: '信风减弱，暖水东移，东太平洋异常增温',
-    trade: -0.35,
-    warmCenter: 0.62,
-    thermoTilt: 0.25,
-    westRain: 0.15,
+    title: '厄尔尼诺年',
+    slogan: '风弱了 → 热水东移 → 西旱东涝 · 渔场衰',
+    trade: -0.45,
+    warmCenter: 0.68,
+    thermoTilt: 0.2,
+    westRain: 0.1,
     eastRain: 1,
-    upwelling: 0.18,
+    upwelling: 0.12,
+    fish: 0.12,
     westImpact: '印尼 / 澳北：干旱少雨',
-    eastImpact: '南美西岸：暴雨；渔场衰退',
+    eastImpact: '南美西岸：暴雨 · 渔场衰退',
+    steps: ['信风减弱，甚至西风异常', '暖水向东铺开，东太平洋变暖', '雨带东移：西旱东涝'],
   },
   lanina: {
-    title: '拉尼娜',
-    subtitle: '信风偏强，冷舌更强，暖池更偏西',
-    trade: 1.35,
-    warmCenter: 0.12,
-    thermoTilt: 1.35,
+    title: '拉尼娜年',
+    slogan: '信风更猛 → 暖池更西 → 西更涝 · 渔场更旺',
+    trade: 1.45,
+    warmCenter: 0.1,
+    thermoTilt: 1.45,
     westRain: 1,
     eastRain: 0,
     upwelling: 1,
+    fish: 1.2,
     westImpact: '印尼 / 澳北：更涝',
-    eastImpact: '秘鲁沿岸：更冷、渔场旺',
+    eastImpact: '秘鲁：更冷 · 渔场更旺',
+    steps: ['信风比正常年更强', '暖水更西，东侧冷舌加强', '西边更湿；东岸渔场更旺'],
   },
 }
 
-const targetMode = computed<Mode>(() => {
+const targetMode = computed<EnsoMode>(() => {
   if (props.stepId === 'elnino' || props.stepId === 'lanina') return props.stepId
   return 'normal'
 })
 
-const hint = computed(() => {
-  const m = MODE_META[targetMode.value]
-  return `${m.title} · 课步切换时平滑过渡 · ${m.subtitle}`
-})
+const hint = computed(() => MODE_META[targetMode.value].slogan)
 
-/** 当前插值后的可视状态 */
 const vis = ref<ModeState>({ ...MODE_META.normal })
 let fromState: ModeState = { ...MODE_META.normal }
 let toState: ModeState = { ...MODE_META.normal }
@@ -86,40 +92,92 @@ let morphing = false
 let raf = 0
 let disposed = false
 let lastT = 0
-let phase = 0
 let drawAccum = 0
+let storyBeat = 0
+let storyTimer = 0
+
+let host: GlobeHost | null = null
+let ro: ResizeObserver | null = null
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
 }
-
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
 }
 
 function blendState(a: ModeState, b: ModeState, t: number): ModeState {
   const e = easeInOut(t)
-  // 标题在后半段切换，避免中途文案错乱
   const meta = e < 0.45 ? a : b
   return {
     title: meta.title,
-    subtitle: meta.subtitle,
+    slogan: meta.slogan,
     westImpact: meta.westImpact,
     eastImpact: meta.eastImpact,
+    steps: meta.steps,
     trade: lerp(a.trade, b.trade, e),
     warmCenter: lerp(a.warmCenter, b.warmCenter, e),
     thermoTilt: lerp(a.thermoTilt, b.thermoTilt, e),
     westRain: lerp(a.westRain, b.westRain, e),
     eastRain: lerp(a.eastRain, b.eastRain, e),
     upwelling: lerp(a.upwelling, b.upwelling, e),
+    fish: lerp(a.fish, b.fish, e),
   }
 }
 
-function startMorph(next: Mode) {
+function ensoLayers(): Record<LayerId, boolean> {
+  const layers = defaultLayerMap()
+  for (const id of Object.keys(layers) as LayerId[]) {
+    if (id !== 'earth') layers[id] = false
+  }
+  layers.enso = true
+  layers.countries = true
+  layers.sun = true
+  return layers
+}
+
+function mountGlobe() {
+  if (!canvasRef.value || host) return
+  host = new GlobeHost(
+    canvasRef.value,
+    {
+      month: 6,
+      axialTilt: true,
+      coriolis: true,
+      landSea: false,
+      sectioned: false,
+      highlightId: null,
+      layers: ensoLayers(),
+      ensoMode: targetMode.value,
+    },
+    () => {},
+  )
+  requestAnimationFrame(() => {
+    if (!wrapRef.value || !host) return
+    host.resize(wrapRef.value.clientWidth, wrapRef.value.clientHeight)
+    host.framePacific()
+  })
+}
+
+function pushGlobeMode(mode: EnsoMode) {
+  host?.update({ ensoMode: mode, layers: { enso: true, countries: true, sun: true } })
+}
+
+function disposeGlobe() {
+  ro?.disconnect()
+  ro = null
+  host?.dispose()
+  host = null
+}
+
+function startMorph(next: EnsoMode) {
   fromState = { ...vis.value }
   toState = { ...MODE_META[next] }
   morphT = 0
   morphing = true
+  storyBeat = 0
+  storyTimer = 0
+  pushGlobeMode(next)
 }
 
 function ensureAnim(defs: d3.Selection<SVGDefsElement, unknown, null, undefined>) {
@@ -128,20 +186,15 @@ function ensureAnim(defs: d3.Selection<SVGDefsElement, unknown, null, undefined>
     .append('style')
     .attr('id', 'as-anim')
     .text(`
-      .as-flow { stroke-dasharray: 9 12; animation: as-dash 3.4s linear infinite; }
-      .as-flow-rev { stroke-dasharray: 9 12; animation: as-dash 4.2s linear infinite reverse; }
-      .as-flow-fast { stroke-dasharray: 8 10; animation: as-dash 2.6s linear infinite; }
-      .as-bob { animation: as-bob 3.8s ease-in-out infinite; }
-      .as-rain { animation: as-rain 1.6s linear infinite; }
-      .as-pulse { animation: as-pulse 3.2s ease-in-out infinite; }
-      .as-up { animation: as-up 2.8s ease-in-out infinite; }
-      @keyframes as-dash { to { stroke-dashoffset: -42; } }
-      @keyframes as-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+      .as-flow { stroke-dasharray: 8 12; animation: as-dash 3s linear infinite; }
+      .as-flow-fast { stroke-dasharray: 7 10; animation: as-dash 2.2s linear infinite; }
+      .as-rain { animation: as-rain 1.35s linear infinite; }
+      .as-up { animation: as-up 2.4s ease-in-out infinite; }
+      @keyframes as-dash { to { stroke-dashoffset: -40; } }
       @keyframes as-rain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 18; } }
-      @keyframes as-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
       @keyframes as-up {
-        0%, 100% { transform: translateY(3px); opacity: 0.4; }
-        50% { transform: translateY(-5px); opacity: 1; }
+        0%, 100% { transform: translateY(4px); opacity: 0.3; }
+        50% { transform: translateY(-6px); opacity: 1; }
       }
     `)
 }
@@ -154,8 +207,8 @@ function markers(defs: d3.Selection<SVGDefsElement, unknown, null, undefined>) {
       .attr('viewBox', '0 0 10 10')
       .attr('refX', 8)
       .attr('refY', 5)
-      .attr('markerWidth', 9)
-      .attr('markerHeight', 9)
+      .attr('markerWidth', 7)
+      .attr('markerHeight', 7)
       .attr('orient', 'auto')
       .attr('markerUnits', 'userSpaceOnUse')
       .append('path')
@@ -164,308 +217,193 @@ function markers(defs: d3.Selection<SVGDefsElement, unknown, null, undefined>) {
   }
   mk('as-wind', DemoHex.inkMuted)
   mk('as-warm', DemoHex.warm)
-  mk('as-cold', DemoHex.cold)
-  mk('as-cell', DemoHex.rain)
+  mk('as-cold', '#6ed0a0')
   mk('as-lift', DemoHex.lift)
 }
 
-function drawCloud(
-  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
-  x: number,
-  y: number,
-  opacity: number,
-) {
-  if (opacity < 0.05) return
-  const g = svg.append('g').attr('opacity', opacity).attr('class', 'as-bob')
-  g.append('ellipse').attr('cx', x + 28).attr('cy', y + 8).attr('rx', 34).attr('ry', 14).attr('fill', DemoHex.cloud)
-  g.append('ellipse').attr('cx', x + 10).attr('cy', y + 10).attr('rx', 18).attr('ry', 11).attr('fill', '#d8e4f0')
-  g.append('ellipse').attr('cx', x + 48).attr('cy', y + 6).attr('rx', 20).attr('ry', 12).attr('fill', '#e8f0f8')
-}
-
-function drawRain(
-  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
-  x: number,
-  y: number,
-  h: number,
-  opacity: number,
-) {
-  if (opacity < 0.08) return
-  const g = svg.append('g').attr('opacity', opacity)
-  for (let i = 0; i < 7; i++) {
-    const xx = x + i * 9
-    g.append('line')
-      .attr('x1', xx)
-      .attr('x2', xx - 2)
-      .attr('y1', y)
-      .attr('y2', y + h)
-      .attr('stroke', DemoHex.rain)
-      .attr('stroke-width', 1.2)
-      .attr('stroke-dasharray', '3 5')
-      .attr('class', 'as-rain')
-      .attr('style', `animation-delay: ${i * 0.12}s`)
-  }
-}
-
-function draw() {
+/** 右侧窄剖面：补地球上看不清的「海面以下」 */
+function drawSide() {
   const el = svgRef.value
   if (!el) return
   const svg = d3.select(el)
   svg.selectAll('*').remove()
-
   const m = vis.value
   const defs = svg.append('defs')
   ensureAnim(defs)
   markers(defs)
 
-  const wc = m.warmCenter
   const sst = defs.append('linearGradient').attr('id', 'as-sst').attr('x1', '0').attr('y1', '0').attr('x2', '1').attr('y2', '0')
-  // 用连续参数驱动色停，避免模式硬切
-  const warmBoost = Math.max(0, 1 - m.thermoTilt) // 厄尔尼诺时倾斜小 → 暖色东扩
-  sst.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.coldDeep)
-  sst
-    .append('stop')
-    .attr('offset', `${Math.max(5, wc * 100 - 18)}%`)
-    .attr('stop-color', warmBoost > 0.5 ? '#3a6a88' : DemoHex.warmDeep)
-  sst
-    .append('stop')
-    .attr('offset', `${wc * 100}%`)
-    .attr('stop-color', warmBoost > 0.5 ? DemoHex.warm : '#ff9a4a')
-  sst
-    .append('stop')
-    .attr('offset', `${Math.min(95, wc * 100 + 22)}%`)
-    .attr('stop-color', m.thermoTilt > 1.1 ? '#0d3a58' : warmBoost > 0.5 ? '#ffb070' : DemoHex.coldDeep)
-  sst.append('stop').attr('offset', '100%').attr('stop-color', warmBoost > 0.5 ? '#6aa0b8' : DemoHex.canvasFog)
-
-  const sky = defs.append('linearGradient').attr('id', 'as-sky').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
-  sky.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.canvasFog)
-  sky.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.panel)
+  const wc = m.warmCenter
+  const warmBoost = Math.max(0, 1 - m.thermoTilt)
+  sst.append('stop').attr('offset', '0%').attr('stop-color', warmBoost > 0.45 ? '#d07040' : '#e89850')
+  sst.append('stop').attr('offset', `${wc * 100}%`).attr('stop-color', '#ffe8b0')
+  sst.append('stop').attr('offset', '100%').attr('stop-color', m.thermoTilt > 1.05 ? '#071e30' : '#143e58')
 
   const deep = defs.append('linearGradient').attr('id', 'as-deep').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
-  deep.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.coldGlow).attr('stop-opacity', 0.35)
-  deep.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.canvas)
+  deep.append('stop').attr('offset', '0%').attr('stop-color', '#1a5080').attr('stop-opacity', 0.5)
+  deep.append('stop').attr('offset', '100%').attr('stop-color', '#040a10')
 
-  svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#as-sky)').attr('rx', 12)
+  const thermo = defs.append('linearGradient').attr('id', 'as-thermo').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
+  thermo.append('stop').attr('offset', '0%').attr('stop-color', '#ffc070').attr('stop-opacity', 0.6)
+  thermo.append('stop').attr('offset', '100%').attr('stop-color', '#1a4060').attr('stop-opacity', 0.1)
 
-  svg.append('text').attr('x', 24).attr('y', 28).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text(m.title)
-  svg.append('text').attr('x', 24).attr('y', 46).attr('fill', DemoHex.inkDim).attr('font-size', 10).text(m.subtitle)
-  if (morphing) {
-    svg
-      .append('text')
-      .attr('x', 620)
-      .attr('y', 28)
-      .attr('fill', DemoHex.accent)
-      .attr('font-size', 10)
-      .text(`过渡 ${Math.round(morphT * 100)}%`)
-  } else {
-    svg.append('text').attr('x', 600).attr('y', 28).attr('fill', DemoHex.inkFaint).attr('font-size', 10).text('赤道太平洋剖面示意')
-  }
+  svg.append('rect').attr('width', SW).attr('height', SH).attr('fill', DemoHex.panel).attr('rx', 10)
 
-  const seaY = 210
-  const seaH = 150
-  const seaX0 = 110
-  const seaX1 = 670
-  const seaW = seaX1 - seaX0
+  svg.append('text').attr('x', 14).attr('y', 22).attr('fill', DemoHex.ink).attr('font-size', 12).attr('font-weight', 700).text(m.title)
+  svg.append('text').attr('x', 14).attr('y', 40).attr('fill', DemoHex.lift).attr('font-size', 10).attr('font-weight', 600).text('剖面 · 看斜温层')
 
+  const seaY = 150
+  const seaH = 110
+  const x0 = 36
+  const x1 = 284
+  const seaW = x1 - x0
+
+  svg.append('text').attr('x', x0).attr('y', 58).attr('fill', DemoHex.inkFaint).attr('font-size', 9).text('西·亚洲')
+  svg.append('text').attr('x', x1).attr('y', 58).attr('text-anchor', 'end').attr('fill', DemoHex.inkFaint).attr('font-size', 9).text('东·南美')
+
+  // 大气带
+  svg.append('rect').attr('x', x0).attr('y', 64).attr('width', seaW).attr('height', seaY - 64).attr('fill', '#101c2a').attr('opacity', 0.7)
+  svg.append('rect').attr('x', x0).attr('y', seaY).attr('width', seaW).attr('height', seaH).attr('fill', 'url(#as-deep)')
+
+  const tw = x0 + 8
+  const te = x1 - 8
+  const westDeep = seaY + 28 + m.thermoTilt * 42
+  const eastDeep = seaY + 28 + Math.max(4, (1.5 - m.thermoTilt) * 22)
+  const midY = (westDeep + eastDeep) / 2
   svg
     .append('path')
-    .attr('d', `M 20 ${seaY - 20} L 110 ${seaY - 8} L 110 ${seaY + seaH} L 20 ${seaY + seaH + 10} Z`)
-    .attr('fill', DemoHex.ground)
-  svg.append('text').attr('x', 58).attr('y', seaY + 70).attr('text-anchor', 'middle').attr('fill', DemoHex.inkDim).attr('font-size', 10).text('亚洲 / 澳')
+    .attr('d', `M ${x0} ${seaY} L ${x1} ${seaY} L ${te} ${eastDeep} Q ${(tw + te) / 2} ${midY}, ${tw} ${westDeep} L ${x0} ${westDeep} Z`)
+    .attr('fill', 'url(#as-thermo)')
+  svg.append('rect').attr('x', x0).attr('y', seaY - 2).attr('width', seaW).attr('height', 14).attr('fill', 'url(#as-sst)')
   svg
     .append('path')
-    .attr('d', `M 670 ${seaY - 10} L 760 ${seaY - 30} L 760 ${seaY + seaH + 10} L 670 ${seaY + seaH} Z`)
-    .attr('fill', DemoHex.groundDark)
-  svg.append('text').attr('x', 715).attr('y', seaY + 70).attr('text-anchor', 'middle').attr('fill', DemoHex.inkDim).attr('font-size', 10).text('南美')
-
-  svg
-    .append('rect')
-    .attr('x', seaX0)
-    .attr('y', 58)
-    .attr('width', seaW)
-    .attr('height', seaY - 58)
-    .attr('fill', DemoHex.panelSoft)
-    .attr('opacity', 0.45)
-
-  svg.append('rect').attr('x', seaX0).attr('y', seaY).attr('width', seaW).attr('height', seaH).attr('fill', 'url(#as-deep)')
-  svg
-    .append('rect')
-    .attr('x', seaX0)
-    .attr('y', seaY)
-    .attr('width', seaW)
-    .attr('height', 28)
-    .attr('fill', 'url(#as-sst)')
-    .attr('opacity', 0.92)
-    .attr('class', 'as-pulse')
-
-  const tw = seaX0 + 30
-  const te = seaX1 - 30
-  const westDeep = seaY + 55 + m.thermoTilt * 48
-  const eastDeep = seaY + 55 + (1.5 - m.thermoTilt) * 28
-  svg
-    .append('path')
-    .attr('d', `M ${tw} ${westDeep} Q ${(tw + te) / 2} ${(westDeep + eastDeep) / 2 + 10}, ${te} ${eastDeep}`)
+    .attr('d', `M ${tw} ${westDeep} Q ${(tw + te) / 2} ${midY}, ${te} ${eastDeep}`)
     .attr('fill', 'none')
-    .attr('stroke', DemoHex.inkDim)
+    .attr('stroke', DemoHex.inkMuted)
     .attr('stroke-width', 1.6)
-    .attr('stroke-dasharray', '6 5')
-    .attr('opacity', 0.85)
+    .attr('stroke-dasharray', '5 4')
   svg
     .append('text')
-    .attr('x', (tw + te) / 2)
-    .attr('y', (westDeep + eastDeep) / 2 + 22)
+    .attr('x', (x0 + x1) / 2)
+    .attr('y', midY + 16)
     .attr('text-anchor', 'middle')
-    .attr('fill', DemoHex.inkFaint)
-    .attr('font-size', 10)
-    .text('斜温层')
+    .attr('fill', DemoHex.inkMuted)
+    .attr('font-size', 9)
+    .attr('font-weight', 600)
+    .text(m.thermoTilt > 0.85 ? '斜温层西深东浅' : m.thermoTilt < 0.4 ? '斜温层趋平' : '斜温层')
 
-  const upG = svg.append('g').attr('opacity', m.upwelling)
-  for (const x of [seaX1 - 70, seaX1 - 50, seaX1 - 30]) {
+  const warmX = x0 + seaW * m.warmCenter
+  svg
+    .append('ellipse')
+    .attr('cx', warmX)
+    .attr('cy', seaY + 10)
+    .attr('rx', 28 + warmBoost * 16)
+    .attr('ry', 10)
+    .attr('fill', DemoHex.warm)
+    .attr('opacity', 0.45)
+  svg
+    .append('text')
+    .attr('x', warmX)
+    .attr('y', seaY + 28)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#fff0e0')
+    .attr('font-size', 9)
+    .attr('font-weight', 700)
+    .text(m.warmCenter > 0.5 ? '热水在东' : '暖池')
+
+  // 信风
+  const wy = seaY - 28
+  if (m.trade > 0.08) {
+    svg
+      .append('path')
+      .attr('d', `M ${x1 - 16} ${wy} C ${x0 + seaW * 0.6} ${wy - 4}, ${x0 + seaW * 0.35} ${wy + 4}, ${x0 + 20} ${wy}`)
+      .attr('fill', 'none')
+      .attr('stroke', DemoHex.inkMuted)
+      .attr('stroke-width', 2)
+      .attr('marker-end', 'url(#as-wind)')
+      .attr('class', m.trade > 1.1 ? 'as-flow-fast' : 'as-flow')
+    svg.append('text').attr('x', (x0 + x1) / 2).attr('y', wy - 10).attr('text-anchor', 'middle').attr('fill', DemoHex.inkMuted).attr('font-size', 9).attr('font-weight', 600).text('信风→西')
+  } else if (m.trade < -0.08) {
+    svg
+      .append('path')
+      .attr('d', `M ${x0 + 20} ${wy} C ${x0 + seaW * 0.35} ${wy + 4}, ${x0 + seaW * 0.6} ${wy - 4}, ${x1 - 16} ${wy}`)
+      .attr('fill', 'none')
+      .attr('stroke', DemoHex.warm)
+      .attr('stroke-width', 2)
+      .attr('marker-end', 'url(#as-warm)')
+      .attr('class', 'as-flow')
+    svg.append('text').attr('x', (x0 + x1) / 2).attr('y', wy - 10).attr('text-anchor', 'middle').attr('fill', DemoHex.warm).attr('font-size', 9).attr('font-weight', 600).text('西风异常→东')
+  }
+
+  // 上升成云
+  const riseX = x0 + seaW * Math.min(0.8, Math.max(0.15, m.warmCenter))
+  svg
+    .append('path')
+    .attr('d', `M ${riseX} ${seaY - 4} L ${riseX} ${76}`)
+    .attr('stroke', DemoHex.lift)
+    .attr('stroke-width', 2)
+    .attr('marker-end', 'url(#as-lift)')
+    .attr('class', 'as-flow')
+
+  // 上升流
+  const upOp = Math.max(0.12, m.upwelling)
+  const upG = svg.append('g').attr('opacity', upOp)
+  for (const x of [x1 - 40, x1 - 24]) {
     upG
       .append('path')
-      .attr('d', `M ${x} ${seaY + 120} L ${x} ${seaY + 40}`)
-      .attr('stroke', '#7dd3a0')
-      .attr('stroke-width', 1.5)
+      .attr('d', `M ${x} ${seaY + 90} L ${x} ${seaY + 24}`)
+      .attr('stroke', '#6ed0a0')
+      .attr('stroke-width', 2)
       .attr('marker-end', 'url(#as-cold)')
       .attr('class', 'as-up')
   }
   upG
     .append('text')
-    .attr('x', seaX1 - 50)
-    .attr('y', seaY + 138)
+    .attr('x', x1 - 32)
+    .attr('y', seaY + 104)
     .attr('text-anchor', 'middle')
-    .attr('fill', '#7dd3a0')
-    .attr('font-size', 10)
-    .text(m.upwelling < 0.35 ? '上升流减弱' : '上升流')
+    .attr('fill', '#6ed0a0')
+    .attr('font-size', 9)
+    .attr('font-weight', 700)
+    .text(m.upwelling < 0.3 ? '上升流弱' : '上升流')
 
-  const windY = seaY - 28
-  // 信风：按 trade 符号/强度连续显隐，避免过零硬切
-  if (m.trade > 0.08) {
-    const windClass = m.trade > 1.1 ? 'as-flow-fast' : 'as-flow'
-    const sw = 1.8 + Math.max(0, m.trade - 1) * 0.6
-    const op = 0.35 + Math.min(1, m.trade) * 0.5
-    for (const y of [windY - 18, windY, windY + 18]) {
-      svg
-        .append('path')
-        .attr('d', `M ${seaX1 - 40} ${y} C ${seaX0 + seaW * 0.65} ${y - 4}, ${seaX0 + seaW * 0.35} ${y + 4}, ${seaX0 + 50} ${y}`)
-        .attr('fill', 'none')
-        .attr('stroke', DemoHex.inkMuted)
-        .attr('stroke-width', sw)
-        .attr('marker-end', 'url(#as-wind)')
-        .attr('class', windClass)
-        .attr('opacity', op)
-    }
+  // 结果
+  svg.append('rect').attr('x', 12).attr('y', 278).attr('width', 142).attr('height', 48).attr('rx', 6).attr('fill', DemoHex.panelSoft).attr('stroke', 'rgba(94,200,240,0.3)')
+  svg.append('rect').attr('x', 166).attr('y', 278).attr('width', 142).attr('height', 48).attr('rx', 6).attr('fill', DemoHex.panelSoft).attr('stroke', 'rgba(224,122,95,0.35)')
+  svg.append('text').attr('x', 20).attr('y', 296).attr('fill', DemoHex.coldSoft).attr('font-size', 10).attr('font-weight', 700).text('西太平洋')
+  svg.append('text').attr('x', 20).attr('y', 314).attr('fill', DemoHex.inkMuted).attr('font-size', 10).text(m.westImpact)
+  svg.append('text').attr('x', 174).attr('y', 296).attr('fill', DemoHex.warm).attr('font-size', 10).attr('font-weight', 700).text('东太平洋')
+  svg.append('text').attr('x', 174).attr('y', 314).attr('fill', DemoHex.inkMuted).attr('font-size', 10).text(m.eastImpact)
+
+  const beat = Math.floor(storyBeat) % 3
+  svg.append('text').attr('x', 14).attr('y', 348).attr('fill', DemoHex.lift).attr('font-size', 10).attr('font-weight', 700).text('成因 1→2→3')
+  m.steps.forEach((s, i) => {
+    const on = i === beat
+    const y = 366 + i * 16
+    svg
+      .append('circle')
+      .attr('cx', 22)
+      .attr('cy', y - 3)
+      .attr('r', on ? 7 : 5)
+      .attr('fill', on ? (i === 0 ? DemoHex.inkMuted : i === 1 ? DemoHex.warm : DemoHex.lift) : DemoHex.panelSoft)
     svg
       .append('text')
-      .attr('x', seaX0 + seaW / 2)
-      .attr('y', windY - 36)
+      .attr('x', 22)
+      .attr('y', y)
       .attr('text-anchor', 'middle')
-      .attr('fill', DemoHex.inkDim)
-      .attr('font-size', 10)
-      .attr('opacity', op)
-      .text(m.trade > 1.1 ? '信风偏强 → 西' : '信风（东南信风）→ 西')
-  }
-  if (m.trade < -0.08) {
-    const op = 0.35 + Math.min(1, Math.abs(m.trade)) * 0.5
-    for (const y of [windY - 10, windY + 10]) {
-      svg
-        .append('path')
-        .attr('d', `M ${seaX0 + 60} ${y} C ${seaX0 + seaW * 0.4} ${y + 6}, ${seaX0 + seaW * 0.65} ${y - 4}, ${seaX1 - 60} ${y}`)
-        .attr('fill', 'none')
-        .attr('stroke', DemoHex.warm)
-        .attr('stroke-width', 1.6)
-        .attr('marker-end', 'url(#as-warm)')
-        .attr('class', 'as-flow')
-        .attr('opacity', op)
-    }
+      .attr('fill', on ? DemoHex.canvas : DemoHex.inkFaint)
+      .attr('font-size', 8)
+      .attr('font-weight', 800)
+      .text(String(i + 1))
     svg
       .append('text')
-      .attr('x', seaX0 + seaW / 2)
-      .attr('y', windY - 36)
-      .attr('text-anchor', 'middle')
-      .attr('fill', DemoHex.warm)
-      .attr('font-size', 10)
-      .attr('opacity', op)
-      .text('信风减弱 · 西风异常')
-  }
-  if (Math.abs(m.trade) <= 0.08) {
-    svg
-      .append('text')
-      .attr('x', seaX0 + seaW / 2)
-      .attr('y', windY - 36)
-      .attr('text-anchor', 'middle')
-      .attr('fill', DemoHex.inkFaint)
-      .attr('font-size', 10)
-      .text('信风接近停滞…')
-  }
-
-  const riseX = seaX0 + seaW * Math.min(0.85, Math.max(0.15, m.warmCenter))
-  // 下沉支：随暖池东移而西移（厄尔尼诺）
-  const sinkBlend = Math.max(0, Math.min(1, (m.warmCenter - 0.2) / 0.45))
-  const sinkX = lerp(seaX1 - 80, seaX0 + seaW * 0.22, sinkBlend)
-
-  svg
-    .append('path')
-    .attr('d', `M ${riseX} ${seaY - 8} Q ${riseX - 10} 140, ${riseX} 80`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.lift)
-    .attr('stroke-width', 2)
-    .attr('marker-end', 'url(#as-lift)')
-    .attr('class', 'as-flow')
-  svg.append('text').attr('x', riseX + 8).attr('y', 120).attr('fill', DemoHex.lift).attr('font-size', 10).text('上升')
-
-  const highEast = riseX > sinkX
-  svg
-    .append('path')
-    .attr('d', `M ${riseX} 78 C ${(riseX + sinkX) / 2} 58, ${(riseX + sinkX) / 2} 58, ${sinkX} 78`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.rain)
-    .attr('stroke-width', 1.6)
-    .attr('marker-end', 'url(#as-cell)')
-    .attr('class', highEast ? 'as-flow-rev' : 'as-flow')
-    .attr('opacity', 0.85)
-
-  svg
-    .append('path')
-    .attr('d', `M ${sinkX} 80 Q ${sinkX + 8} 140, ${sinkX} ${seaY - 8}`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.inkDim)
-    .attr('stroke-width', 1.8)
-    .attr('marker-end', 'url(#as-wind)')
-    .attr('class', 'as-flow')
-  svg.append('text').attr('x', sinkX - 28).attr('y', 120).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('下沉')
-
-  drawCloud(svg, riseX - 36, 68, Math.max(m.westRain, m.eastRain) * 0.95)
-  drawRain(svg, riseX - 28, 95, 55, Math.max(m.westRain, m.eastRain))
-  drawCloud(svg, sinkX - 30, 70, 0.15 + (1 - m.eastRain) * 0.12)
-
-  const warmLabelX = seaX0 + seaW * m.warmCenter
-  svg
-    .append('text')
-    .attr('x', warmLabelX)
-    .attr('y', seaY + 18)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#fff0e0')
-    .attr('font-size', 10)
-    .attr('font-weight', 600)
-    .attr('class', 'as-bob')
-    .text(m.warmCenter > 0.45 ? '暖水东移' : '暖池')
-  if (m.warmCenter < 0.5) {
-    svg
-      .append('text')
-      .attr('x', seaX1 - 70)
-      .attr('y', seaY + 18)
-      .attr('text-anchor', 'middle')
-      .attr('fill', DemoHex.coldSoft)
-      .attr('font-size', 10)
-      .text('冷舌')
-  }
-
-  svg.append('rect').attr('x', 24).attr('y', 392).attr('width', 360).attr('height', 32).attr('rx', 6).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
-  svg.append('rect').attr('x', 396).attr('y', 392).attr('width', 360).attr('height', 32).attr('rx', 6).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
-  svg.append('text').attr('x', 36).attr('y', 412).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('西太平洋')
-  svg.append('text').attr('x', 110).attr('y', 412).attr('fill', DemoHex.inkMuted).attr('font-size', 10).text(m.westImpact)
-  svg.append('text').attr('x', 408).attr('y', 412).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('东太平洋')
-  svg.append('text').attr('x', 482).attr('y', 412).attr('fill', DemoHex.inkMuted).attr('font-size', 10).text(m.eastImpact)
+      .attr('x', 34)
+      .attr('y', y)
+      .attr('fill', on ? DemoHex.ink : DemoHex.inkFaint)
+      .attr('font-size', on ? 10 : 9)
+      .attr('font-weight', on ? 700 : 400)
+      .text(s.length > 16 ? s.slice(0, 15) + '…' : s)
+  })
 }
 
 function loop() {
@@ -474,22 +412,25 @@ function loop() {
   const now = performance.now()
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
-  phase += dt
   drawAccum += dt
+  storyTimer += dt
+  if (storyTimer >= 2.4) {
+    storyTimer = 0
+    storyBeat = (storyBeat + 1) % 3
+  }
 
   if (morphing) {
-    morphT = Math.min(1, morphT + dt / 1.15)
+    morphT = Math.min(1, morphT + dt / 1.35)
     vis.value = blendState(fromState, toState, morphT)
     if (morphT >= 1) {
       morphing = false
       vis.value = { ...toState }
     }
-    draw()
+    drawSide()
     drawAccum = 0
-  } else if (drawAccum >= 0.12) {
-    // 低频刷新以驱动 CSS 动画类重建后的雨滴相位
+  } else if (drawAccum >= 0.14) {
     drawAccum = 0
-    draw()
+    drawSide()
   }
 }
 
@@ -503,29 +444,51 @@ onMounted(() => {
   vis.value = { ...MODE_META[targetMode.value] }
   toState = { ...vis.value }
   lastT = performance.now()
-  draw()
+  mountGlobe()
+  if (wrapRef.value) {
+    ro = new ResizeObserver(() => {
+      if (!wrapRef.value || !host) return
+      host.resize(wrapRef.value.clientWidth, wrapRef.value.clientHeight)
+    })
+    ro.observe(wrapRef.value)
+  }
+  drawSide()
   loop()
 })
+
 onUnmounted(() => {
   disposed = true
   cancelAnimationFrame(raf)
+  disposeGlobe()
   d3.select(svgRef.value).selectAll('*').remove()
 })
 </script>
 
 <template>
-  <div class="wrap">
+  <div class="demo">
     <div class="toolbar">
       <span class="hint">{{ hint }}</span>
-      <span class="badge">模式平滑过渡</span>
+      <span class="note">左地球看暖池怎么移 · 右剖面看斜温层 · 切课步过渡</span>
     </div>
-    <svg ref="svgRef" class="canvas" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet" />
+    <div class="body">
+      <div ref="wrapRef" class="globe-wrap">
+        <canvas ref="canvasRef" class="globe" />
+        <div class="legend">
+          <span class="warm">暖池</span>
+          <span class="wind">信风箭头</span>
+          <span class="up">上升流 / 鱼</span>
+          <em>可拖转地球</em>
+        </div>
+      </div>
+      <svg ref="svgRef" class="side" :viewBox="`0 0 ${SW} ${SH}`" preserveAspectRatio="xMidYMid meet" />
+    </div>
   </div>
 </template>
 
 <style scoped>
-.wrap {
+.demo {
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-canvas);
@@ -540,21 +503,79 @@ onUnmounted(() => {
   background: var(--bg-surface);
 }
 .hint {
-  font-size: 12px;
-  color: var(--text-400);
+  font-size: 13px;
+  color: var(--demo-lift, #f0d078);
+  font-weight: 600;
   margin-right: auto;
 }
-.badge {
+.note {
   font-size: 11px;
-  color: var(--demo-accent-soft);
-  border: 1px solid var(--demo-accent);
-  background: var(--demo-accent-on);
-  padding: 3px 10px;
-  border-radius: 999px;
+  color: var(--text-400);
 }
-.canvas {
+.body {
   flex: 1;
-  width: 100%;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+}
+.globe-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
   min-height: 360px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #080c12;
+}
+.globe {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.legend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(8, 14, 28, 0.75);
+  font-size: 11px;
+  color: #8aa0b4;
+}
+.legend .warm {
+  color: #ffb070;
+}
+.legend .wind {
+  color: #c5d4e4;
+}
+.legend .up {
+  color: #7fd4a0;
+}
+.legend em {
+  font-style: normal;
+  color: #5a7388;
+}
+.side {
+  width: min(340px, 36vw);
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 360px;
+  border-radius: 12px;
+  background: #101820;
+}
+@media (max-width: 900px) {
+  .body {
+    flex-direction: column;
+  }
+  .side {
+    width: 100%;
+    height: 280px;
+    min-height: 260px;
+  }
 }
 </style>

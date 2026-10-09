@@ -29,6 +29,7 @@ export type LayerId =
   | 'earthquakes'
   | 'windfield'
   | 'oceanCurrents'
+  | 'enso'
 
 export type LayerCategory = 'base' | 'geo' | 'atmosphere' | 'climate'
 
@@ -45,6 +46,9 @@ export interface LayerMeta {
   stub?: boolean
 }
 
+/** ENSO 年景（海气相互作用示意） */
+export type EnsoMode = 'normal' | 'elnino' | 'lanina'
+
 /** 每帧 / 更新时传入的场景状态（课程控件 + 图层开关） */
 export interface GlobeFrameState {
   month: number
@@ -54,6 +58,8 @@ export interface GlobeFrameState {
   sectioned: boolean
   highlightId: HotspotId | null
   layers: Record<LayerId, boolean>
+  /** 沃克环流 / 厄尔尼诺示意年景；未开 enso 层时可忽略 */
+  ensoMode?: EnsoMode
 }
 
 export interface GlobeContext {

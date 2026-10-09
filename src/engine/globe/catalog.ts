@@ -70,6 +70,13 @@ export const LAYER_CATALOG: LayerMeta[] = [
     defaultOn: false,
   },
   {
+    id: 'enso',
+    label: '沃克环流·ENSO',
+    description: '赤道太平洋暖池、信风、沃克环流与厄尔尼诺/拉尼娜示意',
+    category: 'climate',
+    defaultOn: false,
+  },
+  {
     id: 'plates',
     label: '板块边界',
     description: '六大板块边界示意（消亡/生长/转换）',
