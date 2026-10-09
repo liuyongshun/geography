@@ -52,10 +52,13 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 ```bash
 npm install
 npm run tauri dev        # 默认：桌面窗口（自动起/复用 Vite :1430）
-npm run tauri build      # 安装包
+npm run build:portable   # Windows 便携版 zip（解压即用，不写注册表；需 MSVC 环境）
+npm run tauri build      # 安装包（NSIS/MSI，可选）
 npm run build:countries  # 重建 public/geo/countries-teach.json
 # 仅调试前端时才：npm run dev
 ```
+
+便携包输出：`dist-portable/地理过程-<version>-windows-portable.zip`。目标机需已有 WebView2（Win10/11 多数自带）。
 
 ---
 

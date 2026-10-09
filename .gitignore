@@ -4,6 +4,7 @@ node_modules
 # Frontend build
 dist
 dist-ssr
+dist-portable
 *.local
 
 # Logs

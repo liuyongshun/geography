@@ -8,6 +8,7 @@
     "dev:frontend": "node scripts/dev-frontend.mjs",
     "build:countries": "node scripts/build-countries.mjs",
     "build": "vue-tsc --noEmit && vite build",
+    "build:portable": "node scripts/build-windows-portable.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

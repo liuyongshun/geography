@@ -38,7 +38,6 @@ const BEIJING = { name: '北京', lat: 39.9, lon: 116.4 } as const
 const basicsTopic = ref<BasicsTopic>('period')
 const poleView = ref<PoleView>('equator')
 const speedLat = ref(0)
-const periodAnim = ref(0)
 const periodKind = ref<PeriodKind>('compare')
 /** 0→1 覆盖一个太阳日（示意）；恒星日约在 0.927 处完成 */
 const periodProgress = ref(0)
@@ -172,7 +171,6 @@ const dnOrbitDeg = computed(() => {
   const d = ((dnOrbitAngle.value * 180) / Math.PI) % 360
   return d < 0 ? d + 360 : d
 })
-const dnYearDay = computed(() => Math.floor((dnOrbitDeg.value / 360) * DAYS_PER_YEAR) + 1)
 
 // —— 昼夜 / 通用 Three ——
 let renderer: THREE.WebGLRenderer | null = null
@@ -190,9 +188,6 @@ let sunLight: THREE.DirectionalLight | null = null
 let sunPoint: THREE.PointLight | null = null
 let sunMesh: THREE.Object3D | null = null
 let sunLookAt: ((c: THREE.Camera) => void) | null = null
-let beijingMarker: THREE.Object3D | null = null
-let userOrbiting = false
-const _bjWorld = new THREE.Vector3()
 const _sunDir = new THREE.Vector3()
 const _qTilt = new THREE.Quaternion()
 const _vTmp = new THREE.Vector3()
@@ -203,7 +198,6 @@ let lastT = 0
 /** day-night | sphere | basics | timezones */
 let threeMode: 'day-night' | 'sphere' | 'basics' | 'timezones' | null = null
 let tzMarkerGroup: THREE.Group | null = null
-let tzSunLight: THREE.DirectionalLight | null = null
 const TZ_EARTH_R = 100
 let terminatorRing: THREE.Mesh | null = null
 let terminatorGlow: THREE.Mesh | null = null
@@ -299,8 +293,6 @@ function teardownThree() {
     pathGroup = null
   }
   sphereTracks = []
-  beijingMarker = null
-  userOrbiting = false
   sunLight = null
   sunPoint = null
   sunMesh = null
@@ -327,7 +319,6 @@ function teardownThree() {
   sceneAmbient = null
   sceneFill = null
   tzMarkerGroup = null
-  tzSunLight = null
   dnOrbitAngle.value = Math.PI
   for (const obj of disposables) disposeObj(obj)
   disposables = []
@@ -600,24 +591,6 @@ function addEarthAxisEquator(group: THREE.Group, R: number) {
   )
 }
 
-function addAxisAndPoles(group: THREE.Group, R: number) {
-  const axisLen = R * 2 + 48
-  group.add(
-    addDisposable(
-      new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, axisLen, 12), new THREE.MeshBasicMaterial({ color: Demo3.earthMarker })),
-    ),
-  )
-  const poleN = new THREE.Mesh(new THREE.ConeGeometry(3.0, 9, 12), new THREE.MeshBasicMaterial({ color: Demo3.earthMarker }))
-  poleN.position.y = axisLen / 2 + 2
-  group.add(addDisposable(poleN))
-  const poleS = new THREE.Mesh(new THREE.ConeGeometry(3.0, 9, 12), new THREE.MeshBasicMaterial({ color: Demo3.earthMarker }))
-  poleS.position.y = -(axisLen / 2 + 2)
-  poleS.rotation.x = Math.PI
-  group.add(addDisposable(poleS))
-  group.add(addDisposable(makeLabelSprite('北', 0, axisLen / 2 + 16, 0, { scale: 0.85 })))
-  group.add(addDisposable(makeLabelSprite('南', 0, -(axisLen / 2 + 16), 0, { scale: 0.85 })))
-}
-
 function addSpinDirectionArc(group: THREE.Group, R: number, latDeg = 10) {
   const arcPts: THREE.Vector3[] = []
   const φ = (latDeg * Math.PI) / 180
@@ -647,8 +620,6 @@ function initThreeCanvas(mode: 'day-night' | 'sphere' | 'basics' | 'timezones') 
   if (!canvas || !wrapRef.value) return false
   disposed = false
   disposables = []
-  beijingMarker = null
-  userOrbiting = false
   threeMode = mode
   const w = wrapRef.value.clientWidth || 640
   const h = Math.max(280, wrapRef.value.clientHeight - 48)
@@ -1341,7 +1312,6 @@ function setupDayNight() {
   const marker = new THREE.Mesh(new THREE.SphereGeometry(1.8, 14, 12), tubeMat(Demo3.earthMarker, 0.95))
   marker.position.copy(p)
   earthSpinRoot.add(addDisposable(marker))
-  beijingMarker = marker
   const halo = new THREE.Mesh(
     new THREE.RingGeometry(2.4, 3.4, 24),
     new THREE.MeshBasicMaterial({
@@ -2427,8 +2397,6 @@ function setupTimezones() {
       )
     }
   }
-
-  tzSunLight = null
 
   tzMarkerGroup = new THREE.Group()
   globeRoot.add(tzMarkerGroup)
