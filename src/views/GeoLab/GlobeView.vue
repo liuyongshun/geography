@@ -87,8 +87,8 @@ watch(
 </script>
 
 <template>
-  <div ref="wrapRef" class="globe-wrap">
-    <div class="layer-tags" role="toolbar" aria-label="地球图层">
+  <div ref="wrapRef" class="globe-wrap" data-dili-canvas>
+    <div class="layer-tags" data-dili-chrome role="toolbar" aria-label="地球图层">
       <button
         v-for="tag in store.layerTags"
         :key="tag.id"
@@ -108,11 +108,11 @@ watch(
       </button>
     </div>
 
-    <p v-if="store.layerConflictNotice" class="conflict-toast" role="status">
+    <p v-if="store.layerConflictNotice" class="conflict-toast" data-dili-chrome role="status">
       {{ store.layerConflictNotice }}
     </p>
 
-    <aside v-if="store.cityWeather" class="weather-card">
+    <aside v-if="store.cityWeather" class="weather-card" data-dili-chrome>
       <header>
         <strong>{{ store.cityWeather.city.nameZh }}</strong>
         <button type="button" class="x" @click="store.clearCityWeather()">×</button>
@@ -129,7 +129,7 @@ watch(
     </aside>
 
     <canvas ref="canvasRef" />
-    <p class="hint">
+    <p class="hint" data-dili-chrome>
       拖动旋转 · Tag 插拔图层 · 开启「主要城市」后点击城市查天气
       <template v-if="store.layers.countries && store.countriesDisclaimer">
         · {{ store.countriesDisclaimer }}

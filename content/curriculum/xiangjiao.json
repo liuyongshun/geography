@@ -25,11 +25,16 @@
                   "tutorials": [
                     {
                       "id": "universe-earth",
-                      "title": "天体系统与地球特殊性",
-                      "status": "planned",
-                      "kind": "concept",
-                      "minutes": 12,
-                      "objectives": ["区分天体与天体系统", "说明地球存在生命的条件"]
+                      "title": "太阳系与地球的宇宙环境",
+                      "status": "ready",
+                      "kind": "process",
+                      "minutes": 14,
+                      "objectives": [
+                        "识别太阳系八大行星与小行星带",
+                        "区分类地行星与巨行星",
+                        "说明地球在太阳系中的位置与宜居条件之一",
+                        "认识银河系银盘、旋臂与太阳系大致位置"
+                      ]
                     }
                   ]
                 },

@@ -32,6 +32,7 @@ alwaysApply: false
 - 右侧主区禁止大段说明；控件条一行内解决。
 - 课步只列短标题；细节用图形状态表达。
 - 需要地球时：内嵌缩小 Globe，或按钮跳转 `/lab/:id`。
+- **全屏预览**：壳层 `DemoLab` 主舞台已标 `data-dili-canvas`；课内工具条/HUD 用 `.toolbar` / `.hud`（或 `data-dili-chrome`）。全屏只露画布，勿自建无侧栏全屏路由。
 
 ## 观感与动画（必做）
 

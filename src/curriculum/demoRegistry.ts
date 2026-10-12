@@ -27,6 +27,20 @@ export interface DemoEntry {
  * 未列出的课不进 DemoLab；planned 地球预览仍走 /lab。
  */
 export const DEMO_REGISTRY: DemoEntry[] = [
+  // —— 必修1 第一章 宇宙中的地球 ——
+  {
+    tutorialId: 'universe-earth',
+    title: '地球的宇宙环境',
+    status: 'ready',
+    engine: 'three',
+    steps: [
+      { id: 'system', title: '太阳系结构' },
+      { id: 'structure', title: '内行星与外行星' },
+      { id: 'earth', title: '地球的位置' },
+      { id: 'galaxy', title: '银河系云图' },
+    ],
+    load: () => import('@/demos/universe-earth/index.vue'),
+  },
   // —— 选必1 第一章 ——
   {
     tutorialId: 'earth-rotation',

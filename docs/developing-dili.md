@@ -34,6 +34,7 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 |------|------|
 | 3D 地球、气压带、洋流、ENSO/沃克环流、直射点等 | Three.js + `three-globe`（`GlobeHost` + 可插拔图层） |
 | 过程时间线 / 锋面剖面 / 火山成岩等微场景 | Three.js 自建场景（可 OrbitControls） |
+| 银河系棒旋示意点云 | `threejs-galaxy-shader`（MIT；嵌入现有 scene/composer，叠教学标注） |
 | 循环图式、类型卡片、地带谱等 2D 示意 | D3 / 手写 SVG |
 | 区域填色、线路、一带一路、产业转移 | MapLibre GL |
 | 温湿柱、产业结构、时间序列 | Apache ECharts |
@@ -55,6 +56,8 @@ npm run tauri dev        # 默认：桌面窗口（自动起/复用 Vite :1430�
 npm run build:portable   # Windows 便携版 zip（解压即用，不写注册表；需 MSVC 环境）
 npm run tauri build      # 安装包（NSIS/MSI，可选）
 npm run build:countries  # 重建 public/geo/countries-teach.json
+npm run build:stars      # 重建 public/astro/bright-stars.json
+npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 # 仅调试前端时才：npm run dev
 ```
 
@@ -75,8 +78,16 @@ npm run build:countries  # 重建 public/geo/countries-teach.json
 | `earth-topology.png` | 地形 bump | 教学用起伏示意 |
 | `earth-period.jpg` | 恒星日/太阳日、地转偏向、时区、公转/五带示意球 | NASA Visible Earth **land_shallow_topo_2048**（陆地浅海地形真彩），公有领域；见 `earth-period-disclaimer.json` |
 | `earth-period-disclaimer.json` | 上项声明 | 课堂示意 · 非测绘依据 |
-| `sun-hmi.jpg` | 太阳表面（日面 billboard） | NASA SDO **AIA 171Å** 1024px（`latest_1024_0171.jpg`），公有领域；经 `sunVisual` 抠黑底并提对比（文件名历史原因仍为 sun-hmi） |
+| `sun-hmi.jpg` | 太阳表面（日面 billboard） | NASA SDO **HMI Intensitygram Flattened** 2048px（`latest_2048_HMIIF.jpg`），公有领域；经 `sunVisual` 抠黑底（文件名历史原因仍为 sun-hmi） |
 | `sun-disclaimer.json` | 太阳贴图声明 | 非观测预报 |
+| `space/milky-way.jpg` | 太阳系课全天银道光带 | NASA SVS **Deep Star Maps** 8K equirectangular，公有领域；叠 BSC5 亮星光晕与密星尘 |
+| `space/milky-way-disk.jpg` | （可选）银河系俯视参考图 | NASA/JPL **PIA10748** 公有领域（`npm run build:galaxy-disk`）；课堂主视觉已改用 `threejs-galaxy-shader`｜勿用银心红外特写 |
+| `space/disclaimer.json` | 星空贴图声明 | 非导航依据；可选升级 [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) |
+| `astro/bright-stars.json` | 亮星星表（锐化+星名） | Yale **BSC5** 转换（`npm run build:stars`），公有领域目录数据 |
+| `astro/milky-way-arms-teach.json` | 银河系旋臂教学迹线 | Reid et al. 2019 等简化（`npm run build:galaxy`），课堂示意 |
+| `astro/disclaimer.json` | 星表 / 旋臂声明 | 课堂示意、非观测 |
+| `textures/planets/*.jpg` | 八大行星表面 | Solar System Scope 等开源教学贴图（CC-BY）；地球用 Blue Marble |
+| `textures/planets/saturn_ring.png` | 土星光环径向剖面 | 条带贴图经 `RingGeometry` UV 重映射（U=半径）完整显示；课堂示意 |
 | `rocks/lava-color.jpg` | 熔岩观感 | ambientCG **Lava001**，**CC0** |
 | `rocks/igneous-color.jpg` | 岩浆岩 | ambientCG **Rock023**，**CC0** |
 | `rocks/sedimentary-color.jpg` | 沉积岩（类型卡） | ambientCG **Rock035**，**CC0** |
@@ -162,6 +173,7 @@ src-tauri/               桌面壳
 - 课与图层 → **绑定表**，禁止页面里硬编码一长串 `layers.xxx = true`。
 - Demo 主题 → `theme.ts` + CSS `--demo-*`，禁止示意层散落硬编码色。
 - 布局：**左侧 `SideNav` 课程目录常驻**，右侧 `RouterView` 换内容（资源 / 教程说明 / DemoLab / GeoLab）。演示课与地球预览必须挂在 `AppShell` 子路由，禁止独立全屏页把目录卸掉。
+- **画布全屏预览**：宿主根节点标 `data-dili-canvas`，工具条/HUD 标 `data-dili-chrome`（或沿用 `.toolbar` / `.hud`）。`CanvasFullscreenButton` + `useCanvasFullscreen` 全屏该节点并隐藏 chrome，只留画布；`Esc` 退出。勿另开无侧栏路由。
 
 ---
 
@@ -195,7 +207,7 @@ src-tauri/               桌面壳
 4. **贴图**：需要质感时用 ambientCG 等 CC0，放 `public/textures/...`，写 `disclaimer.json`；UI 角标注明「示意 · 非鉴定」。
 5. **勿**用干巴静态框图或仅虚线滚动冒充过程。
 
-样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时，对照选必1·1.1 PPT）。
+样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。
 
 ---
 

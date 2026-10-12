@@ -8,6 +8,7 @@ import {
   getDemo,
 } from '@/curriculum/demoRegistry'
 import DemoPlaceholder from './DemoPlaceholder.vue'
+import { toggleCanvasFullscreen } from '@/composables/useCanvasFullscreen'
 
 const curriculum = curriculumJson as Curriculum
 const route = useRoute()
@@ -35,6 +36,10 @@ const canvas = computed(() => {
 function goGlobe() {
   router.push({ name: 'lab', params: { tutorialId: tutorialId.value } })
 }
+
+async function goFullscreen() {
+  await toggleCanvasFullscreen()
+}
 </script>
 
 <template>
@@ -48,7 +53,10 @@ function goGlobe() {
           <span class="eng">· {{ ENGINE_LABEL[demo.engine] }}</span>
         </p>
       </div>
-      <el-button v-if="demo" size="small" @click="goGlobe">地球预览</el-button>
+      <div v-if="demo" class="top-actions">
+        <el-button size="small" @click="goFullscreen">全屏预览</el-button>
+        <el-button size="small" @click="goGlobe">地球预览</el-button>
+      </div>
     </header>
 
     <div v-if="demo" class="body">
@@ -68,7 +76,7 @@ function goGlobe() {
         </nav>
       </aside>
 
-      <main class="stage">
+      <main class="stage" data-dili-canvas>
         <component
           :is="canvas"
           v-if="canvas"
@@ -126,6 +134,11 @@ function goGlobe() {
 }
 .eng {
   color: var(--primary-mid);
+}
+.top-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .body {
   flex: 1;

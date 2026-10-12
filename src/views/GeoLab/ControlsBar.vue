@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import sunUrl from '@meteocons/svg/line/clear-day.svg?url'
 import { useGeoSceneStore } from '@/stores/geoScene'
 import { monthLabel } from '@/engine/atmosphere'
+import { toggleCanvasFullscreen } from '@/composables/useCanvasFullscreen'
 
 const props = withDefaults(
   defineProps<{
@@ -30,10 +31,8 @@ function onMonth(v: number | number[]) {
 }
 
 async function toggleFullscreen() {
-  const el = document.querySelector('.geo-lab')
-  if (!el) return
-  if (!document.fullscreenElement) await el.requestFullscreen()
-  else await document.exitFullscreen()
+  // 只全屏地球画布，不带顶栏/课步面板
+  await toggleCanvasFullscreen()
 }
 </script>
 
@@ -92,7 +91,7 @@ async function toggleFullscreen() {
       </template>
     </div>
 
-    <el-button v-if="!compact" size="small" @click="toggleFullscreen">全屏授课</el-button>
+    <el-button size="small" @click="toggleFullscreen">全屏预览</el-button>
   </div>
 </template>
 

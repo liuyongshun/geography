@@ -1,0 +1,11 @@
+{
+  "disclaimer": "课堂示意：亮星星表由 Yale Bright Star Catalogue（bsc5）转换；银河系旋臂迹线据 Reid et al. 2019 等简化。均为教学数据点云/云图，非实时观测或精密银道测量。",
+  "license": "Public domain catalog data / teaching derivative of published arm models",
+  "source": "http://tdc-www.harvard.edu/catalogs/bsc5.dat.gz",
+  "sourcePage": "http://tdc-www.harvard.edu/catalogs/bsc5.html",
+  "files": {
+    "bright-stars.json": "BSC5 亮星（V≤6.5）方向+星等+Bayer/Flamsteed名+部分中文常用名，由 scripts/build-bright-stars.mjs 生成",
+    "bsc5.dat.gz": "原始目录（构建用，运行时读 JSON）",
+    "milky-way-arms-teach.json": "银河系四臂+猎户支臂教学迹线（kpc），npm run build:galaxy；见文件内 source"
+  }
+}

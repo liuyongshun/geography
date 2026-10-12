@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 /** 版本号变更时强制绕过浏览器 / WebView 对 public 贴图的缓存 */
-export const SUN_TEX_VERSION = '20260921-aia171'
+export const SUN_TEX_VERSION = '20261011-hmiif2048-b'
 export const SUN_HMI_URL = `/textures/sun-hmi.jpg?v=${SUN_TEX_VERSION}`
 
 /** SDO 日面是圆盘 + 方图黑底，不能直接贴 UV 球（会出黑圈）。做成朝向相机的日面。 */
@@ -36,7 +36,8 @@ export function makeSunBillboard(radius: number): {
           const mat = disk.material as THREE.MeshBasicMaterial
           mat.map = tex
           mat.color.set(0xffffff)
-          mat.alphaTest = 0.04
+          // 提高阈值，去掉日面外软边光圈感
+          mat.alphaTest = 0.12
           mat.needsUpdate = true
         })
         .catch(() => {
@@ -78,8 +79,8 @@ async function processSunDisk(src: THREE.Texture): Promise<THREE.CanvasTexture> 
   const px = data.data
   const cx = w * 0.5
   const cy = h * 0.5
-  const maxR = Math.min(w, h) * 0.495
-  const soft = Math.min(w, h) * 0.02
+  const maxR = Math.min(w, h) * 0.492
+  const soft = Math.min(w, h) * 0.006
 
   for (let i = 0; i < px.length; i += 4) {
     const p = i / 4
@@ -91,7 +92,7 @@ async function processSunDisk(src: THREE.Texture): Promise<THREE.CanvasTexture> 
     const bb = px[i + 2]!
     const lum = 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
 
-    // 圆外 + 极暗像素（含角标文字区）透明；边缘软过渡保留日珥
+    // 圆外切干净，几乎不留软边光圈
     let alpha = 255
     if (r > maxR + soft || lum < 10) {
       alpha = 0

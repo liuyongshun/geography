@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import SideNav from './SideNav.vue'
 import ResourcesEntry from './ResourcesEntry.vue'
+import CanvasFullscreenButton from '@/components/CanvasFullscreenButton.vue'
 
 const route = useRoute()
 const crumb = computed(() => {
@@ -33,6 +34,7 @@ const fillPane = computed(() => route.name === 'demo' || route.name === 'lab')
         <RouterView />
       </div>
     </div>
+    <CanvasFullscreenButton />
   </div>
 </template>
 

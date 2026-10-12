@@ -126,3 +126,41 @@ body {
   background: var(--bg-app);
   -webkit-font-smoothing: antialiased;
 }
+
+/* —— 画布全屏预览：只留图形，藏工具条 / HUD —— */
+[data-dili-canvas]:fullscreen,
+[data-dili-canvas]:-webkit-full-screen {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: #000 !important;
+  overflow: hidden !important;
+}
+
+[data-dili-canvas]:fullscreen [data-dili-chrome],
+[data-dili-canvas]:-webkit-full-screen [data-dili-chrome],
+/* Demo 常见控件（未显式打 chrome 标记时也隐藏） */
+[data-dili-canvas]:fullscreen :is(.toolbar, .hud, aside.hud, .layer-tags, .weather-card, .hint, .conflict-toast, .note),
+[data-dili-canvas]:-webkit-full-screen
+  :is(.toolbar, .hud, aside.hud, .layer-tags, .weather-card, .hint, .conflict-toast, .note) {
+  display: none !important;
+}
+
+[data-dili-canvas]:fullscreen .wrap,
+[data-dili-canvas]:-webkit-full-screen .wrap,
+[data-dili-canvas]:fullscreen .stage,
+[data-dili-canvas]:-webkit-full-screen .stage,
+[data-dili-canvas]:fullscreen .globe,
+[data-dili-canvas]:-webkit-full-screen .globe,
+[data-dili-canvas]:fullscreen canvas,
+[data-dili-canvas]:-webkit-full-screen canvas,
+[data-dili-canvas]:fullscreen svg.canvas,
+[data-dili-canvas]:-webkit-full-screen svg.canvas {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+}

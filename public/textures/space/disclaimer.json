@@ -1,0 +1,16 @@
+{
+  "disclaimer": "课堂示意：深空全天图来自 NASA SVS Deep Star Maps（公有领域）。银河系俯视盘优先使用 NASA/JPL-Caltech 艺术家示意（公有领域，见 milky-way-disk.jpg）；若无该文件则运行时程序烘焙棒旋盘。不作导航或观测预报依据。",
+  "license": "NASA public domain (SVS / JPL artist impressions where applicable)",
+  "source": "https://svs.gsfc.nasa.gov/vis/a000000/a003800/a003895/starmap_8k.jpg",
+  "sourcePage": "https://svs.gsfc.nasa.gov/3895",
+  "files": {
+    "milky-way.jpg": "NASA SVS Deep Star Maps，8K equirectangular 星空（太阳系课背景）",
+    "milky-way-disk.jpg": "NASA/JPL PIA10748 银河系俯视棒旋艺术家示意（公有领域，npm run build:galaxy-disk；勿用银心红外特写）"
+  },
+  "openSourceNotes": [
+    "NASA/CXC/M.Weiss Face-on schematic：https://chandra.harvard.edu/resources/illustrations/milkyWay.html",
+    "NASA/JPL Artist's impression of the Milky Way（Wikimedia PD）",
+    "ESA/Gaia 俯视（CC BY-SA 3.0 IGO，需署名，本仓库默认不用）",
+    "程序烘焙思路参考密度波旋臂 + 星云气体（教学简化）"
+  ]
+}

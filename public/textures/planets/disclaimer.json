@@ -1,0 +1,20 @@
+{
+  "disclaimer": "课堂示意：行星表面贴图来自 Solar System Scope / threex.planets 等开源教学贴图（CC-BY 或同级许可）。不作行星科学鉴定依据。",
+  "license": "CC-BY 4.0 (Solar System Scope) / project textures for education",
+  "source": "https://www.solarsystemscope.com/textures/",
+  "sourcePage": "https://www.solarsystemscope.com/textures/",
+  "files": {
+    "mercury.jpg": "水星",
+    "venus.jpg": "金星表面",
+    "mars.jpg": "火星",
+    "jupiter.jpg": "木星",
+    "saturn.jpg": "土星（Björn Jónsson / Cassini 影像拼合，课堂示意）",
+    "saturn_ring.png": "土星光环径向剖面条带（透明底）",
+    "saturn_ring.jpg": "土星光环条带备用",
+    "uranus.jpg": "天王星",
+    "neptune.jpg": "海王星"
+  },
+  "saturnSource": "https://bjj.mmedia.is/data/saturn/saturn.jpg",
+  "saturnRingSource": "Solar System Scope / 开源教学光环剖面（课堂示意）",
+  "note": "地球使用仓库内 NASA Blue Marble 衍生贴图 earth-blue-marble.jpg；太阳使用 SDO/HMI。"
+}

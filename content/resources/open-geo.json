@@ -25,11 +25,43 @@
           "foreign": true
         },
         {
-          "name": "NASA SDO / AIA",
+          "name": "NASA SDO / HMI",
           "url": "https://sdo.gsfc.nasa.gov/",
-          "desc": "太阳动力学天文台。本应用太阳表面贴图用 AIA 171Å（金黄日冕）。",
+          "desc": "太阳动力学天文台。本应用太阳表面贴图用 HMI Continuum Color。",
           "kind": "太阳观测",
           "license": "公有领域（NASA）",
+          "foreign": true
+        },
+        {
+          "name": "NASA SVS Deep Star Maps",
+          "url": "https://svs.gsfc.nasa.gov/3895",
+          "desc": "全天深空星图。本应用银道背景（milky-way.jpg）；银河系课另叠程序彩晕与 fBm 星云。",
+          "kind": "全天影像",
+          "license": "公有领域（NASA）",
+          "foreign": true
+        },
+        {
+          "name": "NASA SVS Deep Star Maps 2020",
+          "url": "https://svs.gsfc.nasa.gov/4851",
+          "desc": "Gaia 上色全天图（EXR/高分 JPG）。可替换 milky-way.jpg 以获得更丰富星色；体积较大，按需引入。",
+          "kind": "全天影像",
+          "license": "公有领域（NASA）",
+          "foreign": true
+        },
+        {
+          "name": "Yale Bright Star Catalogue (BSC5)",
+          "url": "http://tdc-www.harvard.edu/catalogs/bsc5.html",
+          "desc": "亮星星表。本应用锐化星点与中文/Bayer 星名标注（npm run build:stars）。",
+          "kind": "星表",
+          "license": "公有领域目录数据",
+          "foreign": true
+        },
+        {
+          "name": "Reid et al. 2019 银河系旋臂模型",
+          "url": "https://ui.adsabs.harvard.edu/abs/2019ApJ...885..131R/abstract",
+          "desc": "银道旋臂结构研究。本应用银河系云图课步的教学迹线据此简化（npm run build:galaxy）。",
+          "kind": "银道结构",
+          "license": "学术论文参数 · 教学简化衍生",
           "foreign": true
         },
         {
