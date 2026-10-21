@@ -137,7 +137,7 @@ function drawBase(
   // 云
   const cg = svg.append('g').attr('class', 'lh-bob').attr('opacity', 0.45)
   cg.append('ellipse').attr('cx', 480).attr('cy', 58).attr('rx', 40).attr('ry', 12).attr('fill', '#c8d6e4')
-  cg.append('ellipse').attr('cx', 508).attr('cy', 54).attr('rx', 22).attr('ry', 10).attr('fill', DemoHex.ink)
+  cg.append('ellipse').attr('cx', 508).attr('cy', 54).attr('rx', 22).attr('ry', 10).attr('fill', DemoHex.cloud)
 
   // 地形
   svg.append('path').attr('d', terrainPath()).attr('fill', '#2f4a36')

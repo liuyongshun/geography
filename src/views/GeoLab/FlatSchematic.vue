@@ -108,7 +108,7 @@ const thermalLow = computed(
         </linearGradient>
       </defs>
 
-      <rect x="0" y="0" :width="W" :height="H" fill="#080c12" rx="12" />
+      <rect x="0" y="0" :width="W" :height="H" fill="#070b16" rx="12" />
 
       <g v-for="lat in [90, 60, 30, 0, -30, -60, -90]" :key="lat">
         <line x1="70" :y1="y(lat)" x2="560" :y2="y(lat)" stroke="#2a3954" stroke-dasharray="3 5" />

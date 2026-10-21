@@ -105,7 +105,7 @@ function drawElements() {
 
   const cx = 390
   const cy = 230
-  svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 46).attr('fill', '#101828').attr('stroke', DemoHex.inkFaint)
+  svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 46).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
   svg.append('text').attr('x', cx).attr('y', cy - 4).attr('text-anchor', 'middle').attr('fill', DemoHex.ink).attr('font-size', 11).attr('font-weight', 600).text('整体性')
   svg.append('text').attr('x', cx).attr('y', cy + 14).attr('text-anchor', 'middle').attr('fill', DemoHex.inkDim).attr('font-size', 10).text('牵一发而动全身')
 
@@ -184,7 +184,7 @@ function drawChain() {
 
   const sky = defs.append('linearGradient').attr('id', 'ei-sky').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
   sky.append('stop').attr('offset', '0%').attr('stop-color', broken.value ? '#1a1420' : '#0d1a28')
-  sky.append('stop').attr('offset', '100%').attr('stop-color', broken.value ? '#241820' : '#152436')
+  sky.append('stop').attr('offset', '100%').attr('stop-color', broken.value ? '#241820' : '#070b16')
 
   svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ei-sky)').attr('rx', 12)
   svg.append('text').attr('x', 24).attr('y', 28).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('案例：森林破坏')
@@ -241,7 +241,7 @@ function drawChain() {
   const cloudOp = broken.value ? 0.28 : 0.75
   const cg = svg.append('g').attr('opacity', cloudOp).attr('class', 'ei-bob')
   cg.append('ellipse').attr('cx', 420).attr('cy', 78).attr('rx', 42).attr('ry', 16).attr('fill', '#c8d6e4')
-  cg.append('ellipse').attr('cx', 448).attr('cy', 74).attr('rx', 24).attr('ry', 14).attr('fill', DemoHex.ink)
+  cg.append('ellipse').attr('cx', 448).attr('cy', 74).attr('rx', 24).attr('ry', 14).attr('fill', DemoHex.cloud)
   if (!broken.value) {
     for (let i = 0; i < 5; i++) {
       svg

@@ -51,7 +51,7 @@ const router = useRouter()
     </section>
 
     <p class="palette-note">
-      界面配色：墨蓝观测台（天空蓝 · 沙金）
+      界面配色：星空（夜空底 · 天空蓝 · 沙金）
     </p>
   </div>
 </template>

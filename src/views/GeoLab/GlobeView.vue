@@ -138,7 +138,7 @@ watch(
         · 已关闭黄赤交角：直射点停在赤道，气压带/晨昏线不随月份移动
       </template>
       <template v-else-if="store.layers.timezones">
-        · 时区：橙色加粗边界（每 15° 理论分区）；经纬网为青色，便于区分
+        · 时区：橙色边界（每 15° 理论分区）；经纬网为青色，便于区分
       </template>
       <template v-else-if="store.layers.insolation">
         · 太阳辐射：NASA CERES 大气顶入射通量（需联网；随月份）
@@ -196,7 +196,7 @@ watch(
 .tag {
   pointer-events: auto;
   border: 1px solid var(--border);
-  background: rgba(12, 22, 40, 0.82);
+  background: rgba(7, 11, 22, 0.82);
   color: var(--text-500);
   font-size: 12px;
   padding: 5px 10px;
@@ -256,7 +256,7 @@ watch(
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(12, 22, 40, 0.92);
+  background: rgba(7, 11, 22, 0.92);
   backdrop-filter: blur(8px);
   color: var(--text-700);
   font-size: 12px;

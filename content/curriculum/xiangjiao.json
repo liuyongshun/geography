@@ -45,7 +45,7 @@
                     {
                       "id": "solar-influence",
                       "title": "太阳辐射与太阳活动",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "concept",
                       "minutes": 15,
                       "objectives": ["比较太阳辐射与太阳活动影响", "联系生产生活实例"]
@@ -59,10 +59,10 @@
                     {
                       "id": "earth-spheres",
                       "title": "内部圈层与外部圈层",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "diagram",
                       "minutes": 12,
-                      "objectives": ["说出地壳、地幔、地核", "理解大气圈、水圈、生物圈相互联系"]
+                      "objectives": ["区分地壳、地幔、地核，指出岩石圈与软流层", "说明大气圈、水圈、生物圈相互渗透"]
                     }
                   ]
                 },
@@ -73,7 +73,7 @@
                     {
                       "id": "earth-history",
                       "title": "地质年代与生命演化简史",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "timeline",
                       "minutes": 14,
                       "objectives": ["识别主要地质年代", "说明化石与地层的指示意义"]
@@ -94,7 +94,7 @@
                     {
                       "id": "fluvial-landforms",
                       "title": "侵蚀、搬运与堆积地貌",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "process",
                       "minutes": 16,
                       "objectives": ["识别河谷、冲积扇、三角洲", "分析流水作用与人类活动"]
@@ -108,7 +108,7 @@
                     {
                       "id": "aeolian-landforms",
                       "title": "风蚀与风积地貌",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "process",
                       "minutes": 12,
                       "objectives": ["认识雅丹、沙丘等典型地貌"]
@@ -122,7 +122,7 @@
                     {
                       "id": "karst-coast-glacier",
                       "title": "三类特殊地貌对照",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "compare",
                       "minutes": 18,
                       "objectives": ["比较溶蚀、海蚀、冰蚀作用", "联系旅游与工程安全"]
@@ -143,7 +143,7 @@
                     {
                       "id": "atmosphere-layers",
                       "title": "对流层到高层大气",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "diagram",
                       "minutes": 12,
                       "objectives": ["说出各层主要特征", "理解天气现象集中在对流层"]
@@ -157,7 +157,7 @@
                     {
                       "id": "atmosphere-heating",
                       "title": "太阳暖大地、大地暖大气",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "process",
                       "minutes": 15,
                       "objectives": ["梳理辐射、吸收、反射路径", "解释温室效应原理"]
@@ -171,7 +171,7 @@
                     {
                       "id": "thermal-circulation",
                       "title": "热力环流的形成与应用",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "process",
                       "minutes": 18,
                       "objectives": ["推导高低气压形成", "解释海陆风、城郊风等实例"]
@@ -192,7 +192,7 @@
                     {
                       "id": "water-cycle",
                       "title": "海陆间循环与水平衡",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "process",
                       "minutes": 14,
                       "objectives": ["绘制水循环示意图", "分析人类活动对水循环的影响"]
@@ -206,7 +206,7 @@
                     {
                       "id": "seawater-motion",
                       "title": "温度、盐度与海水运动",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "concept",
                       "minutes": 16,
                       "objectives": ["说出影响盐度的因素", "区分波浪、潮汐、洋流"]
@@ -220,7 +220,7 @@
                     {
                       "id": "ocean-human",
                       "title": "海洋资源与环境保护",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "case",
                       "minutes": 12,
                       "objectives": ["举例说明海洋对人类的价值与风险"]
@@ -241,7 +241,7 @@
                     {
                       "id": "vegetation-env",
                       "title": "植被类型与水热条件",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "compare",
                       "minutes": 14,
                       "objectives": ["匹配主要植被带与气候", "理解植被对环境的指示作用"]
@@ -255,7 +255,7 @@
                     {
                       "id": "soil-formation",
                       "title": "成土因素与土壤剖面",
-                      "status": "planned",
+                      "status": "ready",
                       "kind": "concept",
                       "minutes": 12,
                       "objectives": ["说出主要成土因素", "认识土壤对农业的意义"]
@@ -437,7 +437,7 @@
                       "区分自转方向、太阳日与恒星日、角速度与线速度",
                       "解释昼夜交替与晨昏线",
                       "理解地转偏向力（北右南左）",
-                      "掌握时区划分与区时换算（东加西减）"
+                      "掌握时区划分、区时换算（东加西减）与过日界线改日期"
                     ]
                   }]
                 },

@@ -58,7 +58,7 @@ const fillPane = computed(() => route.name === 'demo' || route.name === 'lab')
   gap: 8px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(90deg, #0a1018 0%, #141c28 60%, #0a1018 100%);
+  background: linear-gradient(90deg, #070b16 0%, #10182a 60%, #070b16 100%);
   font-size: 13px;
   color: var(--text-500);
 }

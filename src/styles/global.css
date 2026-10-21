@@ -1,13 +1,15 @@
 /**
- * 墨蓝观测台 Atlas Observatory
- * 墨蓝底 + 天空蓝主色 + 沙金点缀；避开青绿赛博与紫粉霓虹。
- * Demo 示意色见 src/demos/theme.ts（--demo-* 与之同值）。
+ * 星空
+ * 夜空底 + 天空蓝主色 + 沙金点缀；与地球、晨昏场景同一套深空。
+ * 示意图纸面与文字见 src/demos/theme.ts（--demo-* 与之同值）。
  */
 :root {
-  --c-void: #0a1018;
-  --c-panel: #141c28;
+  color-scheme: dark;
+
+  --c-void: #070b16;
+  --c-panel: #10182a;
   --c-steel: #2a3548;
-  --c-sky: #4aa3d9;
+  --c-sky: #6ec8f0;
   --c-sand: #e8b84a;
 
   --primary: #4aa3d9;
@@ -15,18 +17,18 @@
   --primary-mid: #7ec4eb;
   --primary-light: rgba(74, 163, 217, 0.16);
 
-  --bg-app: #0a1018;
-  --bg-surface: #141c28;
-  --bg-subtle: #101820;
-  --bg-canvas: #080c12;
+  --bg-app: #070b16;
+  --bg-surface: #10182a;
+  --bg-subtle: #0c1220;
+  --bg-canvas: #070b16;
 
   --text-900: #eef3f7;
-  --text-700: #b4c2d0;
-  --text-500: #7d8fa3;
+  --text-700: #c5d4e4;
+  --text-500: #8aa0b4;
   --text-400: #5c6e82;
 
   --border: #243044;
-  --border-light: #1e2838;
+  --border-light: #1c2838;
 
   /* 教学语义色：低压天空蓝 / 高压琥珀 / 风带淡青 */
   --geo-low: #4aa3d9;
@@ -42,9 +44,9 @@
   /*
    * DemoLab 示意主题（与 src/demos/theme.ts DemoHex 同值）
    */
-  --demo-canvas: #080c12;
-  --demo-canvas-fog: #0a1018;
-  --demo-panel: #101820;
+  --demo-canvas: #070b16;
+  --demo-canvas-fog: #0a1020;
+  --demo-panel: #10182a;
   --demo-ink: #eef3f7;
   --demo-ink-muted: #c5d4e4;
   --demo-ink-dim: #8aa0b4;
@@ -72,13 +74,22 @@
   --demo-earth-terminator: #f0d078;
   --demo-earth-dawn: #5eb4e8;
   --demo-earth-dusk: #e08a5a;
+  --demo-earth-date: #d94f9c;
+  --demo-sphere-crust: #8d5a32;
+  --demo-sphere-lith: #9a9186;
+  --demo-sphere-asthen: #d2652e;
+  --demo-sphere-mantle: #e25822;
+  --demo-sphere-outer: #f0a31a;
+  --demo-sphere-inner: #ffe9a0;
+  --demo-sphere-rise: #ffe08a;
+  --demo-sphere-line: #2a211c;
 
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32);
   --shadow-md: 0 8px 24px rgba(0, 8, 16, 0.5);
-  --glow-teal: 0 0 0 1px rgba(74, 163, 217, 0.35), 0 0 18px rgba(74, 163, 217, 0.12);
+  --glow-teal: 0 0 0 1px rgba(110, 200, 240, 0.35), 0 0 18px rgba(74, 163, 217, 0.16);
   --glow-sky: var(--glow-teal);
 
   --el-color-primary: #4aa3d9;
@@ -88,21 +99,21 @@
   --el-color-primary-light-9: rgba(74, 163, 217, 0.16);
   --el-color-primary-dark-2: #2e7eb0;
   --el-border-radius-base: 8px;
-  --el-bg-color: #141c28;
-  --el-bg-color-page: #0a1018;
-  --el-bg-color-overlay: #141c28;
+  --el-bg-color: #10182a;
+  --el-bg-color-page: #070b16;
+  --el-bg-color-overlay: #10182a;
   --el-text-color-primary: #eef3f7;
-  --el-text-color-regular: #b4c2d0;
-  --el-text-color-secondary: #7d8fa3;
+  --el-text-color-regular: #c5d4e4;
+  --el-text-color-secondary: #8aa0b4;
   --el-text-color-placeholder: #5c6e82;
   --el-border-color: #243044;
-  --el-border-color-light: #1e2838;
-  --el-border-color-lighter: #1e2838;
-  --el-fill-color: #101820;
+  --el-border-color-light: #1c2838;
+  --el-border-color-lighter: #1c2838;
+  --el-fill-color: #0c1220;
   --el-fill-color-light: #152033;
-  --el-fill-color-blank: #101820;
-  --el-fill-color-darker: #0a1018;
-  --el-mask-color: rgba(8, 12, 18, 0.72);
+  --el-fill-color-blank: #0c1220;
+  --el-fill-color-darker: #070b16;
+  --el-mask-color: rgba(5, 8, 18, 0.72);
 }
 
 *,
@@ -136,7 +147,7 @@ body {
   max-height: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  background: #000 !important;
+  background: #070b16 !important;
   overflow: hidden !important;
 }
 
@@ -163,4 +174,67 @@ body {
   height: 100% !important;
   min-height: 0 !important;
   border-radius: 0 !important;
+}
+
+/* 必修一过程示意（SceneFrame） */
+.bx1 {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-canvas);
+}
+.bx1 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.bx1 .chip {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-500);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.bx1 .chip.on {
+  border-color: var(--primary);
+  color: var(--primary-mid);
+  background: var(--primary-light);
+  font-weight: 600;
+}
+.bx1 .canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+.bx1 .lb {
+  font-size: 11px;
+  fill: var(--demo-ink);
+  font-weight: 600;
+}
+.bx1 .dim {
+  font-size: 10px;
+  fill: var(--demo-ink-dim);
+}
+/* 压在深色地面、水体、色块上的字仍用浅色 */
+.bx1 .on-fill {
+  fill: #f7fbff;
+}
+.bx1 .flow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 8 7;
+  animation: bx1-dash 2.8s linear infinite;
+}
+@keyframes bx1-dash {
+  to {
+    stroke-dashoffset: -60;
+  }
 }

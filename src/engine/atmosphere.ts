@@ -156,7 +156,7 @@ export function latLonToVec(lat: number, lon: number, radius: number): [number, 
   ]
 }
 
-/** 墨蓝观测台：低压天空蓝 / 高压琥珀 / 风带淡青 */
+/** 星空：低压天空蓝 / 高压琥珀 / 风带淡青 */
 export const LOW_COLOR = '#4aa3d9'
 export const HIGH_COLOR = '#e8a317'
 export const WIND_COLOR = '#7ec4eb'

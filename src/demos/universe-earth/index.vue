@@ -1038,6 +1038,7 @@ function buildAsteroidBelt() {
  * i≈162.3°（>90° 即逆行）、Ω≈59°、ω≈112°；e/a 略压扁以便同屏可见。
  * 场景 Y 向上、黄道在 XZ：Rz→绕 +Y，Rx→绕 +X。
  * 注意：倾角本身已表示逆行，轨道面内须与行星同向参数化（z=-sin），勿再反号。
+ * 真实远日点在黄道以南；课堂侧视把长轴镜像到黄道以北（+Y），倾角与逆行不变。
  */
 const HALLEY_INC = (162.3 * Math.PI) / 180
 const HALLEY_NODE = (59.1 * Math.PI) / 180
@@ -1057,6 +1058,8 @@ function halleyPos(t: number) {
   v.applyAxisAngle(_halleyAxisY, HALLEY_ARGP) // ω 近日点幅角
   v.applyAxisAngle(_halleyAxisX, HALLEY_INC) // i 倾角（>90° → 逆行）
   v.applyAxisAngle(_halleyAxisY, HALLEY_NODE) // Ω 升交点黄经
+  // 镜像到黄道以北：侧视长轴向上，Ly 符号（逆行）不变
+  v.y = -v.y
   return v
 }
 

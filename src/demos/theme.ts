@@ -3,20 +3,21 @@
  * - CSS：`src/styles/global.css` 中 `--demo-*` 与此保持同值
  * - Three：用 `Demo3.xxx`（number）
  * - D3 / Canvas / Sprite：用 `DemoHex.xxx`（string）
- * 壳层主色为「墨蓝观测台」：天空蓝 + 沙金，见 global.css
+ * 壳层主色为「星空」：夜空底 + 天空蓝 + 沙金，见 global.css。
+ * 与地球场景底色 #070b16 同一套，示意图纸面不再用白底。
  */
 
 export const DemoHex = {
-  /** 画布深底 */
-  canvas: '#080c12',
-  canvasFog: '#0a1018',
-  panel: '#101820',
-  panelSoft: '#141c28',
+  /** 星空画布，与 Globe 夜空同色 */
+  canvas: '#070b16',
+  canvasFog: '#0a1020',
+  panel: '#10182a',
+  panelSoft: '#152033',
   ground: '#24382c',
   groundDark: '#1a2830',
   groundPlate: '#1a2834',
 
-  /** 文字层级 */
+  /** 文字层级（星空上的浅色字） */
   ink: '#eef3f7',
   inkMuted: '#c5d4e4',
   inkDim: '#8aa0b4',
@@ -82,8 +83,22 @@ export const DemoHex = {
   earthDusk: '#ff8a3d',
   earthSpin: '#8fd6f5',
   earthMarker: '#f0d078',
+  /** 国际日期变更线（课堂沿 180° 示意） */
+  earthDate: '#d94f9c',
   earthDayLabel: '#ffe6a0',
   earthNightLabel: '#9eb4cc',
+
+  /** 内部圈层：土色壳、岩浆地幔、铁镍核，彼此分开 */
+  sphereCrust: '#8d5a32',
+  sphereLith: '#9a9186',
+  sphereAsthen: '#d2652e',
+  sphereMantle: '#e25822',
+  sphereOuter: '#f0a31a',
+  sphereInner: '#ffe9a0',
+  /** 地幔上涌箭头，压在熔岩上仍要看得见 */
+  sphereRise: '#ffe08a',
+  /** 浅色切面上的标注线 */
+  sphereLine: '#2a211c',
 } as const
 
 export type DemoHexKey = keyof typeof DemoHex
@@ -197,6 +212,16 @@ export const Demo3 = {
   earthDusk: hexToInt(DemoHex.earthDusk),
   earthSpin: hexToInt(DemoHex.earthSpin),
   earthMarker: hexToInt(DemoHex.earthMarker),
+  earthDate: hexToInt(DemoHex.earthDate),
   earthDayLabel: hexToInt(DemoHex.earthDayLabel),
   earthNightLabel: hexToInt(DemoHex.earthNightLabel),
+
+  sphereCrust: hexToInt(DemoHex.sphereCrust),
+  sphereLith: hexToInt(DemoHex.sphereLith),
+  sphereAsthen: hexToInt(DemoHex.sphereAsthen),
+  sphereMantle: hexToInt(DemoHex.sphereMantle),
+  sphereOuter: hexToInt(DemoHex.sphereOuter),
+  sphereInner: hexToInt(DemoHex.sphereInner),
+  sphereRise: hexToInt(DemoHex.sphereRise),
+  sphereLine: hexToInt(DemoHex.sphereLine),
 } as const

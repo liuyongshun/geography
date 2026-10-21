@@ -4,7 +4,7 @@ import * as THREE from 'three'
 export const SUN_TEX_VERSION = '20261011-hmiif2048-b'
 export const SUN_HMI_URL = `/textures/sun-hmi.jpg?v=${SUN_TEX_VERSION}`
 
-/** SDO 日面是圆盘 + 方图黑底，不能直接贴 UV 球（会出黑圈）。做成朝向相机的日面。 */
+/** SDO 日面是圆盘 + 方图黑底，不能直接贴 UV 球（会出黑圈）。做成朝向相机的单层日面，不再套外环或光晕圈。 */
 export function makeSunBillboard(radius: number): {
   group: THREE.Group
   lookAt: (camera: THREE.Camera) => void

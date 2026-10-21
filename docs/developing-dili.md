@@ -207,7 +207,7 @@ src-tauri/               桌面壳
 4. **贴图**：需要质感时用 ambientCG 等 CC0，放 `public/textures/...`，写 `disclaimer.json`；UI 角标注明「示意 · 非鉴定」。
 5. **勿**用干巴静态框图或仅虚线滚动冒充过程。
 
-样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。
+样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时与日界线，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。必修第一册「地球的圈层结构」：课步「内部圈层」为 Three 斜视切角（右前上方挖掉互成直角的一角，同时看见切面与 Blue Marble 球面）。切面质感复用已打包的 ambientCG CC0：地壳 `strata-color`（土色沉积岩）、岩石圈 `igneous-color`（岩浆岩）、软流层为受热岩石、地幔 `lava-color`（熔岩）；外核与内核用铁镍熔融色，不跟岩浆同一套橙。壳与软流层厚度已夸张。「外部圈层」单独用 SVG。其余各课（太阳影响、演化、地貌、大气、水、植被与土壤）为带动画箭头的 SVG 过程示意，共用 `src/demos/bx1/SceneFrame.vue`。凡画地球圆盘用 `EarthDisc` 裁切 `earth-blue-marble.jpg`，禁止纯色圆代替地表。
 
 ---
 
@@ -230,7 +230,7 @@ src-tauri/               桌面壳
 ## 7. 主题与观感
 
 - 数据源：`src/demos/theme.ts`（`DemoHex` 字符串 / `Demo3` 整数）。
-- CSS：`src/styles/global.css` 的 `--demo-*`、壳层「墨蓝观测台」主色。
+- CSS：`src/styles/global.css` 的 `--demo-*`、壳层「星空」夜空底（与地球场景 `#070b16` 同一套）。
 - 画布字号宜小（角标约 10px，要素名 10～12px）。
 - **地球示意线**：`DemoHex.earth*` / `EarthLineWidth` / `EarthLineStroke`（实线 vs 虚线）/ `EarthDashDeg`。口诀：**主框架实线，特殊纬线虚线**（回归线、极圈虚线；赤道/经纬网/晨昏实线）。Three 用 Tube/Torus；虚线分段 Tube。样板：`earth-rotation` 晨昏、`layers/latlon.ts`。
 

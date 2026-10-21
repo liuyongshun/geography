@@ -166,6 +166,50 @@ const beijingLocalVsZone = computed(() => {
   return { local, zone }
 })
 
+function wrapLon(lon: number) {
+  return ((((lon + 180) % 360) + 360) % 360) - 180
+}
+
+/** 日界线西侧 = 东经靠近 180° = 东十二区；东侧 = 西经 = 西十二区 */
+function shipSide(lon: number): 'west' | 'east' | 'line' {
+  const w = wrapLon(lon)
+  if (Math.abs(Math.abs(w) - 180) < 1.2) return 'line'
+  return w > 0 ? 'west' : 'east'
+}
+
+/** 课堂基准日：世界时 10 月 20 日。东十二与西十二钟点相同，日期差一天 */
+function zoneStamp(offsetHours: number) {
+  let h = tzUtcHour.value + offsetHours
+  let delta = 0
+  while (h >= 24) {
+    h -= 24
+    delta += 1
+  }
+  while (h < 0) {
+    h += 24
+    delta -= 1
+  }
+  const base = new Date(2026, 9, 20)
+  base.setDate(base.getDate() + delta)
+  return `${base.getMonth() + 1}月${base.getDate()}日 ${formatClock(h)}`
+}
+
+const dateWestLabel = computed(() => zoneStamp(12))
+const dateEastLabel = computed(() => zoneStamp(-12))
+const dateShipLabel = computed(() => {
+  const side = shipSide(dateShipLon.value)
+  if (side === 'line') return '船正在过 180°'
+  if (side === 'west') return '船在日界线西侧 · 东十二区'
+  return '船在日界线东侧 · 西十二区'
+})
+const dateCrossLabel = computed(() => {
+  if (dateAnim) return dateAnim.to > dateAnim.from ? '向东过线 · 日期减一天' : '向西过线 · 日期加一天'
+  const side = shipSide(dateShipLon.value)
+  if (side === 'west') return '向东过线 → 西十二区，日期 −1'
+  if (side === 'east') return '向西过线 → 东十二区，日期 +1'
+  return '两侧钟点相同，日期差一天'
+})
+
 /** 晨昏课步：公转角与年积日（自转–公转按 365.25 联动） */
 const dnOrbitDeg = computed(() => {
   const d = ((dnOrbitAngle.value * 180) / Math.PI) % 360
@@ -198,6 +242,14 @@ let lastT = 0
 /** day-night | sphere | basics | timezones */
 let threeMode: 'day-night' | 'sphere' | 'basics' | 'timezones' | null = null
 let tzMarkerGroup: THREE.Group | null = null
+let dateShipGroup: THREE.Group | null = null
+let dateShipMesh: THREE.Mesh | null = null
+let dateArrow: THREE.Mesh | null = null
+let dateTrail: THREE.Mesh | null = null
+/** 过线动画；经度可大于 180，表示从东十二区继续向东 */
+let dateAnim: { from: number; to: number; t0: number } | null = null
+/** 船位：158°E 在日界线西侧（东十二区） */
+const dateShipLon = ref(158)
 const TZ_EARTH_R = 100
 let terminatorRing: THREE.Mesh | null = null
 let terminatorGlow: THREE.Mesh | null = null
@@ -319,6 +371,12 @@ function teardownThree() {
   sceneAmbient = null
   sceneFill = null
   tzMarkerGroup = null
+  dateShipGroup = null
+  dateShipMesh = null
+  dateArrow = null
+  dateTrail = null
+  dateAnim = null
+  dateShipLon.value = 158
   dnOrbitAngle.value = Math.PI
   for (const obj of disposables) disposeObj(obj)
   disposables = []
@@ -1495,7 +1553,15 @@ function loopThree() {
     updateSphereArrows(dt)
     controls?.update()
   } else if (threeMode === 'timezones') {
-    if (playing.value && globeRoot) globeRoot.rotation.y += dt * 0.08
+    if (dateAnim && globeRoot) {
+      const u = Math.min(1, (now - dateAnim.t0) / 2400)
+      const s = u * u * (3 - 2 * u)
+      dateShipLon.value = dateAnim.from + (dateAnim.to - dateAnim.from) * s
+      syncDateShip()
+      if (u >= 1) dateAnim = null
+    } else if (playing.value && globeRoot) {
+      globeRoot.rotation.y += dt * 0.08
+    }
     controls?.update()
   }
 
@@ -2312,6 +2378,126 @@ function enterCoriolisMode(mode: CoriolisMode) {
   else requestAnimationFrame(() => setupSphereThrow())
 }
 
+function equatorArc(lon0: number, lon1: number, r: number) {
+  const pts: THREE.Vector3[] = []
+  const steps = Math.max(2, Math.ceil(Math.abs(lon1 - lon0) / 3))
+  for (let i = 0; i <= steps; i++) {
+    pts.push(latLonToVec(0, lon0 + ((lon1 - lon0) * i) / steps, r))
+  }
+  return pts
+}
+
+function setDateTrail(mesh: THREE.Mesh | null) {
+  if (dateTrail) {
+    dateShipGroup?.remove(dateTrail)
+    disposeObj(dateTrail)
+    const i = disposables.indexOf(dateTrail)
+    if (i >= 0) disposables.splice(i, 1)
+    dateTrail = null
+  }
+  if (mesh && dateShipGroup) {
+    dateShipGroup.add(mesh)
+    disposables.push(mesh)
+    dateTrail = mesh
+  }
+}
+
+/** 赤道上的过线船：航迹 + 实心箭头，方向即东/西 */
+function syncDateShip() {
+  if (!dateShipGroup || !dateShipMesh || !dateArrow) return
+  const R = TZ_EARTH_R + 2.2
+  const lon = dateShipLon.value
+  const movingEast = dateAnim ? dateAnim.to > dateAnim.from : shipSide(lon) !== 'east'
+  const dir = movingEast ? 1 : -1
+  dateShipMesh.position.copy(latLonToVec(0, lon, R))
+  const tail = dateAnim ? dateAnim.from : lon
+  let head = dateAnim ? lon : 180
+  if (Math.abs(head - tail) < 4) head = tail + dir * 8
+  const pts = equatorArc(tail, head, R)
+  const curve = new THREE.CatmullRomCurve3(pts)
+  setDateTrail(
+    new THREE.Mesh(
+      new THREE.TubeGeometry(curve, Math.max(8, pts.length * 2), EarthLineWidth.mid, 6, false),
+      new THREE.MeshBasicMaterial({ color: Demo3.earthSpin }),
+    ),
+  )
+  const tip = pts[pts.length - 1]!
+  const prev = pts[Math.max(0, pts.length - 2)]!
+  orientArrow(dateArrow, prev, tip)
+}
+
+function frameLon(lon: number, lat = 12) {
+  if (!camera || !controls || !globeRoot) return
+  globeRoot.rotation.y = 0
+  camera.position.copy(latLonToVec(lat, lon, TZ_EARTH_R * 2.55))
+  camera.up.set(0, 1, 0)
+  controls.target.set(0, 0, 0)
+  controls.update()
+}
+
+function lookAtDateLine() {
+  if (threeMode !== 'timezones') return
+  playing.value = false
+  frameLon(180, 16)
+}
+
+function crossDateLine(dir: 'east' | 'west') {
+  if (threeMode !== 'timezones') return
+  playing.value = false
+  frameLon(180, 16)
+  const from = dir === 'east' ? 158 : 202
+  const to = dir === 'east' ? 202 : 158
+  dateAnim = { from, to, t0: performance.now() }
+  dateShipLon.value = from
+  syncDateShip()
+}
+
+function makeDateMeridian(lon: number, R: number) {
+  const pts: THREE.Vector3[] = []
+  for (let lat = -88; lat <= 88; lat += 4) pts.push(latLonToVec(lat, lon, R))
+  const curve = new THREE.CatmullRomCurve3(pts)
+  const mesh = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 64, EarthLineWidth.bold, 6, false),
+    new THREE.MeshBasicMaterial({ color: Demo3.earthDate }),
+  )
+  mesh.renderOrder = 2
+  return mesh
+}
+
+function buildDateLine(R: number) {
+  if (!globeRoot) return
+  globeRoot.add(addDisposable(makeDateMeridian(180, R + 1.6)))
+  const notes: { lon: number; lat: number; text: string }[] = [
+    { lon: 180, lat: 40, text: '日界线' },
+    { lon: 158, lat: 28, text: '东十二区' },
+    { lon: -158, lat: 28, text: '西十二区' },
+  ]
+  for (const n of notes) {
+    const p = latLonToVec(n.lat, n.lon, R + 8)
+    globeRoot.add(
+      addDisposable(
+        makeLabelSprite(n.text, p.x, p.y, p.z, { scale: 0.42, bg: true, color: DemoHex.earthDate }),
+      ),
+    )
+  }
+
+  dateShipGroup = new THREE.Group()
+  globeRoot.add(dateShipGroup)
+  dateShipMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(2.3, 16, 12),
+    new THREE.MeshBasicMaterial({ color: Demo3.earthMarker }),
+  )
+  dateArrow = new THREE.Mesh(
+    new THREE.ConeGeometry(EarthLineWidth.bold * 3.4, EarthLineWidth.bold * 9, 10),
+    new THREE.MeshBasicMaterial({ color: Demo3.earthSpin }),
+  )
+  dateShipGroup.add(addDisposable(dateShipMesh))
+  dateShipGroup.add(addDisposable(dateArrow))
+  dateShipLon.value = 158
+  dateAnim = null
+  syncDateShip()
+}
+
 /** 时区：真实地球 + 理论时区经线（每 15°） */
 function setupTimezones() {
   if (!initThreeCanvas('timezones') || !scene || !camera || !controls) return
@@ -2365,7 +2551,7 @@ function setupTimezones() {
     const isCn = offset === 8 || offset === 9
     const isZero = offset === 0 || offset === 1
     const color = isCn ? 0xffd060 : isZero ? 0x6ec8f0 : 0xf0a020
-    const tube = isCn ? EarthLineWidth.bold : EarthLineWidth.mid
+    const tube = isCn ? EarthLineWidth.special : EarthLineWidth.grid
     const op = isCn ? 0.95 : 0.75
     globeRoot.add(addDisposable(makeEarthMeridian(westLng, R, tube, color, op)))
 
@@ -2403,6 +2589,7 @@ function setupTimezones() {
 
   syncTimezoneMarkers()
   syncTimezoneSun()
+  buildDateLine(R)
   frameTimezoneCamera()
 
   playing.value = true
@@ -2710,7 +2897,10 @@ onUnmounted(() => {
         <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
           {{ playing ? '暂停自转' : '慢速自转' }}
         </button>
-        <span class="note">橙线=时区界 · 东加西减 · 15°≈1h · 拖转地球</span>
+        <button type="button" class="btn" @click="lookAtDateLine">看日界线</button>
+        <button type="button" class="btn" @click="crossDateLine('east')">向东过线</button>
+        <button type="button" class="btn" @click="crossDateLine('west')">向西过线</button>
+        <span class="note">品红竖线=日界线 · 青箭头=过线 · 东加西减</span>
       </template>
     </div>
 
@@ -2778,7 +2968,10 @@ onUnmounted(() => {
         <p class="hud-phase">
           北京时间=东八区≈{{ beijingLocalVsZone.zone }} · 北京地方时≈{{ beijingLocalVsZone.local }}
         </p>
-        <p class="hud-hint">蓝线=中时区（UTC±0）两侧界 · 金线=东八区两侧界 · 橙线=其余时区界</p>
+        <p class="hud-row"><span>日界线西</span><strong>{{ dateWestLabel }}</strong></p>
+        <p class="hud-row"><span>日界线东</span><strong>{{ dateEastLabel }}</strong></p>
+        <p class="hud-phase">{{ dateShipLabel }}</p>
+        <p class="hud-hint">{{ dateCrossLabel }} · 课堂沿 180° 示意</p>
       </aside>
     </div>
 
@@ -2918,7 +3111,7 @@ onUnmounted(() => {
   pointer-events: none;
 }
 .hud-wide {
-  width: 220px;
+  width: 248px;
 }
 .hud-period {
   width: 248px;

@@ -34,6 +34,14 @@ alwaysApply: false
 - 需要地球时：内嵌缩小 Globe，或按钮跳转 `/lab/:id`。
 - **全屏预览**：壳层 `DemoLab` 主舞台已标 `data-dili-canvas`；课内工具条/HUD 用 `.toolbar` / `.hud`（或 `data-dili-chrome`）。全屏只露画布，勿自建无侧栏全屏路由。
 
+## 太阳
+
+日面只留**一个实心圆**（贴图或纯色）。禁止再套外环、光晕圈，或更大一圈半透明圆（叠上去会在边缘形成深色环）。辐射用离开日缘的箭头表示。地表直射点上的小标记环不算太阳外环。
+
+## 地球
+
+画出的地球必须用 `earth-blue-marble.jpg` 或 `earth-period.jpg` 裁成圆盘（`src/demos/bx1/EarthDisc.vue` 或 Three 贴图球）。禁止纯色圆代替地表。内部圈层只在一侧做剖面，另一侧仍是真实地图。
+
 ## 观感与动画（必做）
 
 示意课要以**好看、好懂**为底线，禁止干巴静态示意图凑数。
@@ -77,7 +85,8 @@ alwaysApply: false
 | 地轴 | `earthAxis` 青 | `axis` | **实线** | 细杆 + 小锥；标 N/S |
 | 次要经纬网 | `earthGrid` 暗青 | `grid` | **实线** | 每 30°，低对比 |
 | 赤道 | `earthEquator` 绿青 | `gridMajor` | **实线** | 最醒目纬线 |
-| 本初子午线 | `earthPrime` 亮青 | `gridMajor` | **实线** | 180° 可同级实线 |
+| 本初子午线 | `earthPrime` 亮青 | `gridMajor` | **实线** | 经度 0° |
+| 日界线 | `earthDate` 品红 | `bold` | **实线** | 180° 示意；过线须有箭头 |
 | 南北回归线 | `earthTropic` 沙金 | `special` | **虚线** | ±23.5°，与赤道区分 |
 | 南北极圈 | `earthPolar` 灰蓝 | `special` | **虚线** | ±66.5° |
 | 晨昏线 | `earthTerminator` 沙金 | `mid`+`soft` | **实线** | 软边黄昏带 |

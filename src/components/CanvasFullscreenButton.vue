@@ -54,7 +54,7 @@ watch(
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid rgba(126, 196, 235, 0.35);
-  background: rgba(20, 28, 40, 0.88);
+  background: rgba(7, 11, 22, 0.88);
   color: var(--primary-mid, #7ec4eb);
   font-size: 12px;
   cursor: pointer;
@@ -64,7 +64,7 @@ watch(
 .fs-fab:hover {
   border-color: rgba(126, 196, 235, 0.65);
   color: #eef6fc;
-  background: rgba(30, 44, 62, 0.94);
+  background: rgba(16, 24, 42, 0.94);
 }
 .fs-exit {
   position: fixed;
@@ -77,13 +77,13 @@ watch(
   padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.45);
-  color: rgba(255, 255, 255, 0.85);
+  background: rgba(7, 11, 22, 0.72);
+  color: rgba(238, 243, 247, 0.9);
   font-size: 11px;
   cursor: pointer;
 }
 .fs-exit:hover {
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(7, 11, 22, 0.88);
   color: #fff;
 }
 </style>

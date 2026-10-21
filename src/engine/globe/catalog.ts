@@ -51,7 +51,7 @@ export const LAYER_CATALOG: LayerMeta[] = [
   {
     id: 'timezones',
     label: '时区',
-    description: '理论时区边界（橙色加粗经线，每 15°；教学示意）',
+    description: '理论时区边界（橙色经线，每 15°；教学示意）',
     category: 'geo',
     defaultOn: false,
   },

@@ -11,7 +11,7 @@ const COLOR_ZONE_CN = 0xffd060 // UTC+8 两侧界略亮
 
 /**
  * 理论时区（每 15°，教学示意）。
- * 边界为加粗橙色经线；标签偏赤道以南，减少和经纬度注记叠在一起。
+ * 边界为细橙色经线；标签偏赤道以南，减少和经纬度注记叠在一起。
  */
 export class TimezonesLayer implements GlobeLayer {
   readonly meta: LayerMeta = layerMeta('timezones')!
@@ -37,7 +37,7 @@ export class TimezonesLayer implements GlobeLayer {
       this.group.add(
         makeGlobeTube(
           meridianPoints(westLng, 0.022, 3),
-          isCnEdge ? 0.7 : 0.5,
+          isCnEdge ? 0.32 : 0.22,
           isCnEdge ? COLOR_ZONE_CN : COLOR_ZONE,
           isCnEdge ? 0.95 : 0.85,
           clip,
