@@ -1,0 +1,21 @@
+{
+  "name": "Matterhorn real-terrain teaching prototype",
+  "gridSize": 257,
+  "bboxLV95": [
+    2615000,
+    1090000,
+    2620000,
+    1095000
+  ],
+  "widthMeters": 5000,
+  "heightMeters": 5000,
+  "minElevation": 2088.847,
+  "maxElevation": 4470.592,
+  "heightEncoding": "little-endian uint16, normalized between minElevation and maxElevation",
+  "terrainSource": "swissALTI3D, Federal Office of Topography swisstopo",
+  "imagerySource": "SWISSIMAGE, Federal Office of Topography swisstopo",
+  "source": "https://data.geo.admin.ch/",
+  "license": "swisstopo terms of use for free geodata and geoservices",
+  "attribution": "Source: Federal Office of Topography swisstopo (©swisstopo), modified",
+  "disclaimer": "课堂三维原型；地形与影像来自实测公开数据，标注与垂直自然带仍为教学示意。"
+}

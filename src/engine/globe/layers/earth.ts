@@ -62,6 +62,11 @@ export class EarthLayer implements GlobeLayer {
       .showGraticules(false)
 
     this.dayMaterial = this.globe.globeMaterial() as MeshPhongMaterial
+    this.dayMaterial.color = new Color(0xffffff)
+    this.dayMaterial.emissive = new Color(0x182634)
+    this.dayMaterial.emissiveIntensity = 0.5
+    this.dayMaterial.shininess = 10
+    this.dayMaterial.needsUpdate = true
     ctx.scene.add(this.globe)
     ctx.globe = this.globe
   }
@@ -198,8 +203,9 @@ export class EarthLayer implements GlobeLayer {
     if (!this.globe || !this.dayMaterial) return
     this.revokeOverlay()
     this.dayMaterial.color = new Color(0xffffff)
-    this.dayMaterial.emissive = new Color(0x000000)
-    this.dayMaterial.emissiveIntensity = 0
+    // 微弱蓝灰自发光只用于提起背光区，保留地表纹理可读性。
+    this.dayMaterial.emissive = new Color(0x182634)
+    this.dayMaterial.emissiveIntensity = 0.5
     this.dayMaterial.emissiveMap = null
     this.dayMaterial.shininess = 15
     this.dayMaterial.needsUpdate = true

@@ -1,6 +1,6 @@
 {
-  "disclaimer": "课堂示意贴图，非实测水文数据。地表/冰雪来自 ambientCG 与 Poly Haven（CC0）；水面由 Ice002 色相偏移示意。不作测绘或预报依据。",
-  "license": "CC0-1.0",
+  "disclaimer": "课堂示意贴图，非实测水文或地形。CC0 地表来自 ambientCG 与 Poly Haven；canopy/meadow/scree/snowfield-aerial 及 vertical-alpine-* 是为本课生成的示意，不是实拍，也不是卫星正射。不作测绘或预报依据。",
+  "license": "CC0-1.0 适用于 aerial-grass、aerial-rocks、soil、snow、ice、water；*-aerial.jpg 与 vertical-alpine-* 为本课生成的课堂示意",
   "source": "https://ambientcg.com/ ; https://polyhaven.com/",
   "files": {
     "aerial-grass.jpg": "Poly Haven aerial_grass_rock Diffuse 1K",
@@ -8,6 +8,13 @@
     "soil-color.jpg": "ambientCG Ground003 Color",
     "snow-color.jpg": "ambientCG Snow006 Color",
     "ice-color.jpg": "ambientCG Ice002 Color",
-    "water-color.jpg": "Ice002 色相偏移为河湖水面示意"
+    "water-color.jpg": "Ice002 色相偏移为河湖水面示意",
+    "canopy-aerial.jpg": "本课生成的俯视林冠示意，非实拍",
+    "meadow-aerial.jpg": "本课生成的俯视高山草甸示意，非实拍",
+    "scree-aerial.jpg": "本课生成的俯视碎石坡示意，非实拍",
+    "snowfield-aerial.jpg": "本课生成的俯视雪坡示意，非实拍",
+    "vertical-alpine-wide.jpg": "本课生成的虚构山地全景，非实拍",
+    "vertical-alpine-near.jpg": "本课生成的同山系山体近景，非实拍",
+    "vertical-alpine-valley.jpg": "本课生成的同山系山谷视角，非实拍"
   }
 }

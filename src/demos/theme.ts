@@ -134,8 +134,8 @@ export const EarthLineWidth = {
 
 /** Globe 图层（地球半径≈100）管径：与 Demo 示意 R≈72 的 EarthLineWidth 成比例 */
 export const GlobeGridWidth = {
-  minor: 0.32,
-  major: 0.55,
+  minor: 0.11,
+  major: 0.2,
 } as const
 
 /**

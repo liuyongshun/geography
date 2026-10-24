@@ -11,8 +11,7 @@ import {
 } from '../gridLines'
 
 /**
- * 经纬网：自绘加粗管线（不用 three-globe 自带细灰线）。
- * 色/径与 `theme.ts` Earth 线型规范一致。
+ * 经纬网：细青蓝次要网格，本初子午线与赤道作为主线。
  */
 export class LatLonLayer implements GlobeLayer {
   readonly meta: LayerMeta = layerMeta('latlon')!
@@ -32,7 +31,7 @@ export class LatLonLayer implements GlobeLayer {
           meridianPoints(lng),
           major ? GlobeGridWidth.major : GlobeGridWidth.minor,
           major ? Demo3.earthGridMajor : Demo3.earthGrid,
-          major ? 0.92 : 0.55,
+          major ? 0.72 : 0.32,
           clip,
         ),
       )
@@ -46,7 +45,7 @@ export class LatLonLayer implements GlobeLayer {
           parallelPoints(lat),
           isEq ? GlobeGridWidth.major : GlobeGridWidth.minor,
           isEq ? Demo3.earthEquator : Demo3.earthGrid,
-          isEq ? 0.92 : 0.55,
+          isEq ? 0.78 : 0.32,
           clip,
         ),
       )
@@ -56,12 +55,12 @@ export class LatLonLayer implements GlobeLayer {
     const { dash, gap } = EarthDashDeg.special
     for (const lat of [23.5, -23.5]) {
       this.group.add(
-        makeGlobeDashedParallel(lat, GlobeGridWidth.minor * 1.05, Demo3.earthTropic, 0.78, dash, gap, clip),
+        makeGlobeDashedParallel(lat, GlobeGridWidth.minor * 0.9, Demo3.earthTropic, 0.62, dash, gap, clip),
       )
     }
     for (const lat of [66.5, -66.5]) {
       this.group.add(
-        makeGlobeDashedParallel(lat, GlobeGridWidth.minor * 1.05, Demo3.earthPolar, 0.72, dash, gap, clip),
+        makeGlobeDashedParallel(lat, GlobeGridWidth.minor * 0.9, Demo3.earthPolar, 0.54, dash, gap, clip),
       )
     }
 

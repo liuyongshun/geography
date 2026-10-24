@@ -1,10 +1,24 @@
 ---
-description: 教材教程与地球 Tag 绑定规范
-globs: src/curriculum/**/*,content/curriculum/**/*,src/views/GeoLab/**/*,src/views/Course/**/*,src/views/layout/SideNav.vue
+description: 教材知识数据、总结视图与地球 Tag 绑定规范
+globs: src/curriculum/**/*,content/curriculum/**/*,src/views/KnowledgeSummary/**/*,src/views/GeoLab/**/*,src/views/Course/**/*,src/views/layout/SideNav.vue,src/demos/earth-*/**,src/demos/universe-earth/**,src/engine/realisticEarth.ts
 alwaysApply: false
 ---
 
-# 教材 ↔ 地球图层绑定
+# 教材知识数据 ↔ 总结 ↔ 地球图层
+
+## 数据唯一来源
+
+- `content/curriculum/xiangjiao.json` 是年级、课本、章节、小节、教程与知识目标的唯一来源。
+- 知识点写入 `tutorials[].objectives`；禁止在总结页面、Demo 或组件中复制另一份知识树。
+- `src/curriculum/knowledgeMap.ts` 只负责从教材数据派生树与统计，不保存课程文案。
+- `src/curriculum/demoRegistry.ts` 只保存演示引擎、课步和加载器，不作为知识总结数据源。
+- 新增或修改课程时，同时检查 `id` 稳定性、知识目标完整性和思维导图层级。
+
+## 知识总结
+
+- 总结必须支持按年级、课本、章节筛选，并自动派生思维导图。
+- 层级固定为：年级 → 课本 → 章节 → 小节 → 教程 → 知识点；选中较小范围时从对应节点开始。
+- 知识标题/正文/说明/选中/重点色统一使用 `global.css` 的 `--knowledge-*` 变量。
 
 ## 唯一配置
 
@@ -36,3 +50,11 @@ store.layers.cities = true
 - 每课只开**讲清该知识点所需**图层，默认关掉其余（`earth` 除外）。
 - 人文课优先：`countries` / `cities` / `nightlights`；自然过程课优先：`pressure` / `circulation` / `rivers` / `plates` / `sun`。
 - 改 `xiangjiao.json` 新增 `tutorials[].id` 时，同步补绑定或确认章节兜底足够。
+
+## 真实地球渲染
+
+- 照片级 3D 地球统一复用 `src/engine/realisticEarth.ts`，禁止各 Demo 再复制一套贴图球或大气光圈。
+- 标准效果包含：4K 白天真彩、4K 夜间灯光、平滑晨昏过渡、海洋边缘高光和随太阳方向变化的大气散射。
+- 场景必须调用 `setSunDirection()` 同步太阳方向，并使用 `configureEarthRenderer()` 统一色彩空间与 ACES 色调映射。
+- 经纬网、时区线、地轴和直射点属于独立教学叠加层，不写入真实地球材质。
+- 地球内部剖面、二维教材示意、专题数据球可保留专用材质；专题数据关闭后应恢复统一真实地球视觉。

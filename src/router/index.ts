@@ -27,6 +27,11 @@ export const router = createRouter({
           component: () => import('@/views/Resources/index.vue'),
         },
         {
+          path: 'summary',
+          name: 'knowledge-summary',
+          component: () => import('@/views/KnowledgeSummary/index.vue'),
+        },
+        {
           path: 'demo/:tutorialId',
           name: 'demo',
           component: () => import('@/views/DemoLab/index.vue'),

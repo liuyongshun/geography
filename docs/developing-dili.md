@@ -33,6 +33,7 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 | 场景 | 选型 |
 |------|------|
 | 3D 地球、气压带、洋流、ENSO/沃克环流、直射点等 | Three.js + `three-globe`（`GlobeHost` + 可插拔图层） |
+| 全球飞行、真实区域地形、经纬度与海拔查询 | CesiumJS（Apache-2.0；离线 Workers / Assets 与本地地形，禁止依赖 Cesium ion 或运行时地形服务） |
 | 过程时间线 / 锋面剖面 / 火山成岩等微场景 | Three.js 自建场景（可 OrbitControls） |
 | 银河系棒旋示意点云 | `threejs-galaxy-shader`（MIT；嵌入现有 scene/composer，叠教学标注） |
 | 循环图式、类型卡片、地带谱等 2D 示意 | D3 / 手写 SVG |
@@ -107,7 +108,12 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | `landcover/snow-color.jpg` | 积雪 | ambientCG **Snow006**，**CC0** |
 | `landcover/ice-color.jpg` | 冰川 | ambientCG **Ice002**，**CC0** |
 | `landcover/water-color.jpg` | 河湖水面示意 | Ice002 色相偏移，**CC0** |
-| `landcover/disclaimer.json` | 陆地水体贴图声明 | 标明 CC0 与「非实测水文」 |
+| `landcover/canopy-aerial.jpg` | 垂直带俯视林冠 | 本课生成的示意，非实拍 |
+| `landcover/meadow-aerial.jpg` | 垂直带俯视草甸 | 本课生成的示意，非实拍 |
+| `landcover/scree-aerial.jpg` | 垂直带俯视碎石 | 本课生成的示意，非实拍 |
+| `landcover/snowfield-aerial.jpg` | 垂直带俯视雪坡 | 本课生成的示意，非实拍 |
+| `landcover/vertical-alpine-{wide,near,valley}.jpg` | 垂直带三个摄影式视角 | 本课生成的同一虚构山系，非实拍、非正射 |
+| `landcover/disclaimer.json` | 陆地水体贴图声明 | 标明 CC0、生成图与「非实测」 |
 
 岩石贴图下载站：[ambientCG](https://ambientcg.com/)（优先 1K Color，体积可控）。Poly Haven 俯视地表：[polyhaven.com/textures](https://polyhaven.com/textures)（**CC0**）。
 
@@ -122,6 +128,38 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | `plates-teach.json` | 板块示意 | 自维护 |
 | `ocean-currents-teach.json` | 洋流路径示意 | 自维护 + `disclaimer` |
 
+真实地形原型放在 `public/terrain/matterhorn/`：`height-u16.bin` 是 257×257
+量化高程，`ortho.jpg` 是 4096×4096 正射影像，范围为 LV95
+`[2615000, 1090000, 2620000, 1095000]`。来源为 swisstopo
+**swissALTI3D 2 m** 与 **SWISSIMAGE**，许可和署名写在同目录
+`metadata.json`。运行 `python3 scripts/build-matterhorn-terrain.py` 可重建；
+脚本需要 Python 3 与 Pillow，原始瓦片只缓存到 `.cache/matterhorn-dem/`。
+
+贡嘎山备选原型保存在 `public/terrain/gongga/`：513×513 量化高程覆盖
+贡嘎山、海螺沟及东侧河谷约 40×39 km，DEM 来源为 AWS Open Data 上的
+Mapzen Terrain Tiles（当地底层为 SRTM），4096×4096 地表影像使用
+EOxCloudless 2016（CC BY 4.0，含经处理的 Copernicus Sentinel 数据）。
+`metadata.json` 保存范围、国家公布峰顶高程 7508.9 m、许可及完整署名。
+运行 `python3 scripts/build-gongga-terrain.py` 可重建；需要 Python 3、
+NumPy 与 Pillow，下载缓存位于 `.cache/gongga-terrain/`。
+
+垂直自然带正式场景使用 `public/terrain/kilimanjaro/`：1025×1025
+量化高程覆盖乞力马扎罗山约 27.8×25.4 km，8192×8192 地表影像由四张
+EOxCloudless 2016 WMS 图拼接，并附带 1025×1025 植被概率掩膜，供 GPU
+实例树在近景中恢复森林轮廓。DEM 使用 Mapzen Terrain Tiles（当地底层为
+SRTM）；影像为 CC BY 4.0。`metadata.json` 记录范围、5895 m 峰顶高程、
+垂直夸张、编码、来源和许可。运行
+`python3 scripts/build-kilimanjaro-terrain.py` 可重建；需要 Python 3、
+NumPy 与 Pillow，缓存位于 `.cache/kilimanjaro-terrain/`。
+
+垂直带的动物实拍放在 `public/videos/animals/`，从维基共享资源原片截取并压成无声课堂 WebM，署名见同目录 `disclaimer.json`。界面不放播放控件，静音循环自动播放。已打包的有：印度斯皮提野生雪豹红外相机（Rishi Sharma，CC BY 3.0）、阿尔卑斯羱羊（Tobias Gasser，CC BY-SA 2.5，与岩羊同为羊亚科）、落基山北美鼠兔（mark byzewski，CC BY 2.0，与高原鼠兔同属）、阿尔卑斯旱獭取食（Marcel Zurreck，CC BY 4.0，与喜马拉雅旱獭同属）、喜马拉雅兀鹫（Alahamali70，CC BY-SA 4.0，地点为科威特）、欧亚红松鼠取食（Roberto Verzo，CC BY 3.0）、红腹锦鸡（Andrew Simone，CC BY 2.0，画面有笼网）、北海道虾夷梅花鹿（Nesnad，CC BY 4.0，梅花鹿亚种）、横滨画眉（ContributorQ，CC BY 3.0）。林麝、藏原羚和适合林地带的猕猴，共享资源里没有可用的短片。
+
+`src/demos/env-differentiation/CesiumTerrain.vue` 只使用已打包资源：把
+`height-u16.bin` 转成 `CustomHeightmapTerrainProvider`，全球底图用仓库内 NASA
+Blue Marble，山体范围叠加 `ortho.jpg`。运行时不请求 Cesium ion、全球地形瓦片或
+在线影像。Vite 通过 `vite-plugin-static-copy` 将 Cesium 的 Workers、Assets、
+Widgets 与 ThirdParty 文件复制到 `/cesium/`，打包后可离线运行。
+
 ### 3.3 联网服务（可选层，失败须可降级）
 
 | 服务 | 用途 | 入口 |
@@ -129,6 +167,8 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | [NASA GIBS](https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs) WMS | SST / 叶绿素 / 积雪海冰 / 降水 / **CERES 入射太阳辐射** 等专题 | `src/engine/globe/gibs.ts` |
 | [Open-Meteo](https://open-meteo.com/) | 城市天气、稀疏格点风场 | `geoScene` / `windfield` 图层 |
 | NASA GHRSST（经 GIBS） | 海表温度说明文案 | GeoLab UI |
+| [swisstopo](https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices) STAC / WMS | 构建马特洪峰真实高程与正射影像；运行时使用已打包资源 | `scripts/build-matterhorn-terrain.py` |
+| [Mapzen Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) / [EOxCloudless](https://cloudless.eox.at/) WMS | 构建贡嘎山、乞力马扎罗山 DEM 与 Sentinel-2 无云影像；运行时只使用已打包资源 | `scripts/build-gongga-terrain.py`、`scripts/build-kilimanjaro-terrain.py` |
 
 ### 3.4 内容与课表
 
@@ -207,7 +247,7 @@ src-tauri/               桌面壳
 4. **贴图**：需要质感时用 ambientCG 等 CC0，放 `public/textures/...`，写 `disclaimer.json`；UI 角标注明「示意 · 非鉴定」。
 5. **勿**用干巴静态框图或仅虚线滚动冒充过程。
 
-样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时与日界线，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。必修第一册「地球的圈层结构」：课步「内部圈层」为 Three 斜视切角（右前上方挖掉互成直角的一角，同时看见切面与 Blue Marble 球面）。切面质感复用已打包的 ambientCG CC0：地壳 `strata-color`（土色沉积岩）、岩石圈 `igneous-color`（岩浆岩）、软流层为受热岩石、地幔 `lava-color`（熔岩）；外核与内核用铁镍熔融色，不跟岩浆同一套橙。壳与软流层厚度已夸张。「外部圈层」单独用 SVG。其余各课（太阳影响、演化、地貌、大气、水、植被与土壤）为带动画箭头的 SVG 过程示意，共用 `src/demos/bx1/SceneFrame.vue`。凡画地球圆盘用 `EarthDisc` 裁切 `earth-blue-marble.jpg`，禁止纯色圆代替地表。
+样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时与日界线，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。必修第一册「地球的圈层结构」：课步「内部圈层」为 Three 斜视切角（右前上方挖掉互成直角的一角，同时看见切面与 Blue Marble 球面）。切面质感复用已打包的 ambientCG CC0：地壳 `strata-color`（土色沉积岩）、岩石圈 `igneous-color`（岩浆岩）、软流层为受热岩石、地幔 `lava-color`（熔岩）；外核与内核用铁镍熔融色，不跟岩浆同一套橙。壳与软流层厚度已夸张。「外部圈层」单独用 SVG。其余各课（太阳影响、演化、地貌、大气、水、植被与土壤）为带动画箭头的 SVG 过程示意，共用 `src/demos/bx1/SceneFrame.vue`。凡画地球圆盘用 `EarthDisc` 裁切 `earth-blue-marble.jpg`，禁止纯色圆代替地表。「地域差异性」课步「垂直地带性」采用摄影式 2.5D 教学场景：全景、山体近景、山谷视角使用 `vertical-alpine-*` 三张同一虚构山系生成图，叠加可交互海拔标注、自然带说明与循环水汽抬升箭头；缩放只做有限景深推进，不模拟任意角度测绘旋转。课堂示意，非实拍、非实测地形，也不是卫星正射图。
 
 ---
 

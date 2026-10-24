@@ -1,40 +1,46 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import SideNav from './SideNav.vue'
-import ResourcesEntry from './ResourcesEntry.vue'
-import CanvasFullscreenButton from '@/components/CanvasFullscreenButton.vue'
 
 const route = useRoute()
-const crumb = computed(() => {
-  if (route.name === 'resources') return '开源资源'
-  if (route.name === 'demo') return '图形演示'
-  if (route.name === 'lab') return '地球预览'
-  if (route.name === 'tutorial') return '教程说明'
-  return '课程目录'
+const mainRef = ref<HTMLElement | null>(null)
+let mainResizeObserver: ResizeObserver | null = null
+let resizeFrame = 0
+
+/**
+ * 侧栏宽度动画不会触发 window.resize；统一转发主内容区尺寸变化，
+ * 让 Three.js、Canvas 与图表及时重算画布和相机比例。
+ */
+onMounted(() => {
+  if (!mainRef.value || typeof ResizeObserver === 'undefined') return
+  mainResizeObserver = new ResizeObserver(() => {
+    if (resizeFrame) return
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0
+      window.dispatchEvent(new Event('resize'))
+    })
+  })
+  mainResizeObserver.observe(mainRef.value)
 })
+
+onBeforeUnmount(() => {
+  mainResizeObserver?.disconnect()
+  mainResizeObserver = null
+  if (resizeFrame) cancelAnimationFrame(resizeFrame)
+})
+
 const fillPane = computed(() => route.name === 'demo' || route.name === 'lab')
 </script>
 
 <template>
   <div class="shell">
     <SideNav />
-    <div class="main">
-      <header class="bar">
-        <strong class="brand">地理过程</strong>
-        <span class="sep">/</span>
-        <span>湘教版（2019）同步教程</span>
-        <span class="sep">/</span>
-        <span class="crumb">{{ crumb }}</span>
-        <div class="bar-entry">
-          <ResourcesEntry />
-        </div>
-      </header>
+    <div ref="mainRef" class="main">
       <div class="body" :class="{ fill: fillPane }">
         <RouterView />
       </div>
     </div>
-    <CanvasFullscreenButton />
   </div>
 </template>
 
@@ -51,29 +57,6 @@ const fillPane = computed(() => route.name === 'demo' || route.name === 'lab')
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-.bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(90deg, #070b16 0%, #10182a 60%, #070b16 100%);
-  font-size: 13px;
-  color: var(--text-500);
-}
-.brand {
-  color: var(--primary-mid);
-  font-weight: 700;
-}
-.sep {
-  opacity: 0.5;
-}
-.crumb {
-  color: var(--text-700);
-}
-.bar-entry {
-  margin-left: auto;
 }
 .body {
   flex: 1;

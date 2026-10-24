@@ -1,0 +1,35 @@
+{
+  "name": "Gongga Mountain real-terrain teaching prototype",
+  "gridSize": 513,
+  "bboxWGS84": [
+    101.7,
+    29.43,
+    102.12,
+    29.78
+  ],
+  "widthMeters": 40651,
+  "heightMeters": 38701,
+  "minElevation": 1460.583,
+  "maxElevation": 7434.284,
+  "officialSummitElevation": 7508.9,
+  "summitWGS84": [
+    101.87917,
+    29.59583
+  ],
+  "heightEncoding": "little-endian uint16, normalized between minElevation and maxElevation",
+  "terrainSource": "Mapzen Terrain Tiles on AWS Open Data; local source is SRTM",
+  "imagerySource": "EOxCloudless 2016, contains modified Copernicus Sentinel data 2016 & 2017",
+  "source": [
+    "https://registry.opendata.aws/terrain-tiles/",
+    "https://cloudless.eox.at/"
+  ],
+  "license": [
+    "Terrain source attribution required; underlying SRTM courtesy of USGS",
+    "EOxCloudless 2016: CC BY 4.0"
+  ],
+  "attribution": [
+    "Terrain data © Mapzen; SRTM terrain data courtesy of the U.S. Geological Survey",
+    "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017)"
+  ],
+  "disclaimer": "课堂三维原型；地形与影像来自公开数据，峰顶高程采用2023年国家公布值，自然带边界与标注为教学示意。"
+}

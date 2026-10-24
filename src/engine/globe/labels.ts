@@ -8,7 +8,7 @@ const WORLD_H: Record<LabelKind, number> = {
   city: 1.6,
   anno: 2.0,
   compass: 3.2,
-  zone: 2.1,
+  zone: 1.65,
 }
 
 const FILL: Record<LabelKind, string> = {
@@ -16,7 +16,7 @@ const FILL: Record<LabelKind, string> = {
   city: '#d8e4f0',
   anno: '#7ec8f0',
   compass: '#ffe08a',
-  zone: '#ffc14d',
+  zone: '#e9b74f',
 }
 
 /**
@@ -26,8 +26,8 @@ export function makeGeoLabelSprite(text: string, kind: LabelKind = 'country'): T
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
   const fontPx =
-    kind === 'compass' ? 28 : kind === 'country' ? 22 : kind === 'anno' || kind === 'zone' ? 16 : 18
-  const weight = kind === 'compass' || kind === 'zone' ? 700 : 500
+    kind === 'compass' ? 28 : kind === 'country' ? 22 : kind === 'anno' ? 16 : kind === 'zone' ? 14 : 18
+  const weight = kind === 'compass' ? 700 : kind === 'zone' ? 600 : 500
   const font = `${weight} ${fontPx}px "PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif`
   ctx.font = font
   const tw = Math.ceil(ctx.measureText(text).width)

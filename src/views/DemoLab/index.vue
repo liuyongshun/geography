@@ -3,10 +3,7 @@ import { computed, ref, watch, defineAsyncComponent, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import curriculumJson from '@content/curriculum/xiangjiao.json'
 import { findTutorial, type Curriculum } from '@/curriculum/types'
-import {
-  ENGINE_LABEL,
-  getDemo,
-} from '@/curriculum/demoRegistry'
+import { getDemo } from '@/curriculum/demoRegistry'
 import DemoPlaceholder from './DemoPlaceholder.vue'
 import { toggleCanvasFullscreen } from '@/composables/useCanvasFullscreen'
 
@@ -50,7 +47,6 @@ async function goFullscreen() {
         <p class="path">
           {{ hit.grade.label }} · {{ hit.book.code }} ·
           {{ hit.chapter.no }}{{ hit.chapter.title }}
-          <span class="eng">· {{ ENGINE_LABEL[demo.engine] }}</span>
         </p>
       </div>
       <div v-if="demo" class="top-actions">
@@ -131,9 +127,6 @@ async function goFullscreen() {
   margin: 2px 0 0;
   font-size: 12px;
   color: var(--text-400);
-}
-.eng {
-  color: var(--primary-mid);
 }
 .top-actions {
   display: flex;

@@ -100,7 +100,7 @@ export const LAYER_CATALOG: LayerMeta[] = [
   {
     id: 'circulation',
     label: '大气环流',
-    description: '三圈环流粒子轨迹',
+    description: 'NOAA 三圈环流模型：Hadley / Ferrel / Polar 环流弧与动画粒子',
     category: 'atmosphere',
     defaultOn: true,
   },
@@ -114,7 +114,7 @@ export const LAYER_CATALOG: LayerMeta[] = [
   {
     id: 'sun',
     label: '太阳直射',
-    description: 'NASA SDO/AIA 171 金黄日面 + 直射点；主光随直射方向（本地贴图）',
+    description: '透明写实日面 + 直射点；主光随直射方向（本地贴图）',
     category: 'atmosphere',
     defaultOn: true,
   },

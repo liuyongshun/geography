@@ -344,7 +344,7 @@ export const DEMO_REGISTRY: DemoEntry[] = [
     tutorialId: 'env-differentiation',
     title: '地域差异性',
     status: 'ready',
-    engine: 'd3',
+    engine: 'mixed',
     steps: [
       { id: 'latitudinal', title: '纬度地带性' },
       { id: 'longitudinal', title: '经度地带性' },

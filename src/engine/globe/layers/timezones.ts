@@ -6,8 +6,8 @@ import { disposeLabelSprite, makeGeoLabelSprite } from '../labels'
 import { disposeObject3D, makeGlobeTube, meridianPoints } from '../gridLines'
 
 /** 时区配色：暖橙，与经纬网青蓝区分 */
-const COLOR_ZONE = 0xf0a020
-const COLOR_ZONE_CN = 0xffd060 // UTC+8 两侧界略亮
+const COLOR_ZONE = 0xd99122
+const COLOR_ZONE_CN = 0xffcf5a // UTC+8 两侧界略亮
 
 /**
  * 理论时区（每 15°，教学示意）。
@@ -37,9 +37,9 @@ export class TimezonesLayer implements GlobeLayer {
       this.group.add(
         makeGlobeTube(
           meridianPoints(westLng, 0.022, 3),
-          isCnEdge ? 0.32 : 0.22,
+          isCnEdge ? 0.14 : 0.075,
           isCnEdge ? COLOR_ZONE_CN : COLOR_ZONE,
-          isCnEdge ? 0.95 : 0.85,
+          isCnEdge ? 0.78 : 0.36,
           clip,
         ),
       )

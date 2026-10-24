@@ -93,7 +93,7 @@ export class PressureLayer implements GlobeLayer {
           uColor: { value: color.clone() },
           uCenter: { value: lat },
           uHalf: { value: half },
-          uStrength: { value: highlighted ? 0.95 : 0.62 },
+          uStrength: { value: highlighted ? 0.5 : 0.24 },
           uHighlight: { value: highlighted ? 1 : 0 },
         },
         vertexShader: beltVert,
@@ -123,7 +123,7 @@ export class PressureLayer implements GlobeLayer {
       const rimMat = new THREE.MeshBasicMaterial({
         color: color,
         transparent: true,
-        opacity: highlighted ? 0.85 : 0.4,
+        opacity: highlighted ? 0.46 : 0.16,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         clippingPlanes: clip,

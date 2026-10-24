@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import curriculumJson from '@content/curriculum/xiangjiao.json'
-import { findTutorial, type Curriculum } from '@/curriculum/types'
 import { useGeoSceneStore } from '@/stores/geoScene'
 import GlobeView from './GlobeView.vue'
 import FlatSchematic from './FlatSchematic.vue'
@@ -12,14 +10,11 @@ import ControlsBar from './ControlsBar.vue'
 const store = useGeoSceneStore()
 const router = useRouter()
 const route = useRoute()
-const curriculum = curriculumJson as Curriculum
 
 const tutorialId = computed(() => {
   const id = route.params.tutorialId
   return typeof id === 'string' && id ? id : 'atmosphere-belts-winds'
 })
-
-const courseHit = computed(() => findTutorial(curriculum, tutorialId.value))
 
 /** 是否气压带风带完整实验课（有课步面板） */
 const isAtmosphereLab = computed(() => tutorialId.value === 'atmosphere-belts-winds')
@@ -43,18 +38,6 @@ onUnmounted(() => {
 
 <template>
   <div class="geo-lab">
-    <header class="top">
-      <div class="titles">
-        <h1>
-          {{ courseHit?.tutorial.title ?? store.pack.title }}
-        </h1>
-        <p v-if="courseHit" class="path">
-          {{ courseHit.grade.label }} · {{ courseHit.book.code }} ·
-          {{ courseHit.chapter.no }}{{ courseHit.chapter.title }} · {{ courseHit.section.title }}
-        </p>
-      </div>
-      <span class="role">{{ store.mode === 'teach' ? '授课模式' : '学生探究' }}</span>
-    </header>
     <!-- 月份/交角等季节控件：气压带课完整栏；其它课只要开了直射/晨昏/气压也给出精简栏 -->
     <ControlsBar :compact="!isAtmosphereLab" />
     <div class="stage" :class="{ 'globe-only': !isAtmosphereLab }">
@@ -94,37 +77,6 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   background: var(--bg-app);
-}
-.top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: linear-gradient(90deg, #070b16 0%, #10182a 55%, #070b16 100%);
-  color: var(--text-900);
-  border-bottom: 1px solid var(--border);
-}
-.titles {
-  flex: 1;
-  min-width: 0;
-}
-h1 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 650;
-}
-.path {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: var(--text-400);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.role {
-  font-size: 12px;
-  color: var(--primary-mid);
-  flex-shrink: 0;
 }
 .stage {
   flex: 1;

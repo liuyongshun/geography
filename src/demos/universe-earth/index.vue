@@ -11,6 +11,7 @@ import { DemoHex } from '@/demos/theme'
 import { GalaxyGeometry, GalaxyShader } from 'threejs-galaxy-shader'
 import { createGalaxyNebulaMaterial, hiiRgb, spectralRgb } from '@/engine/galaxyNebula'
 import { makeSunBillboard } from '@/engine/sunVisual'
+import { configureEarthRenderer, createRealisticEarth, type RealisticEarth } from '@/engine/realisticEarth'
 
 const props = defineProps<{
   stepId: string
@@ -104,6 +105,7 @@ let controls: OrbitControls | null = null
 let sunLookAt: ((c: THREE.Camera) => void) | null = null
 let disposables: THREE.Object3D[] = []
 let planets: PlanetRuntime[] = []
+let solarEarth: RealisticEarth | null = null
 let asteroidPoints: THREE.Points | null = null
 let asteroidBeltRoot: THREE.Group | null = null
 let beltLabel: THREE.Sprite | null = null
@@ -145,6 +147,8 @@ function addDisposable(obj: THREE.Object3D) {
 }
 
 function disposeObj(obj: THREE.Object3D) {
+  const disposeTextures = obj.userData.disposeEarthTextures as (() => void) | undefined
+  disposeTextures?.()
   if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {
     obj.geometry.dispose()
     const m = obj.material
@@ -165,6 +169,7 @@ function teardown() {
   for (const obj of disposables) disposeObj(obj)
   disposables = []
   planets = []
+  solarEarth = null
   asteroidPoints = null
   asteroidBeltRoot = null
   beltLabel = null
@@ -1324,7 +1329,7 @@ function setup() {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setClearColor(0x000000, 1)
-  renderer.outputColorSpace = THREE.SRGBColorSpace
+  configureEarthRenderer(renderer, 1.04)
   savedToneMapping = renderer.toneMapping
   savedExposure = renderer.toneMappingExposure
 
@@ -1403,22 +1408,34 @@ function setup() {
     const root = new THREE.Group()
     systemRoot.add(root)
 
-    const map = loader.load(def.tex)
-    map.colorSpace = THREE.SRGBColorSpace
-    map.anisotropy = renderer?.capabilities.getMaxAnisotropy() ?? 8
-    const mat = new THREE.MeshPhongMaterial({
-      map,
-      color: 0xffffff,
-      shininess: def.id === 'earth' ? 12 : 18,
-      specular: new THREE.Color(def.id === 'earth' ? 0x334455 : 0x333333),
-      emissive: new THREE.Color(0xffffff),
-      emissiveMap: map,
-      emissiveIntensity: 0.32,
-    })
-
     const radius = EARTH_R * def.size
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 32), mat)
-    root.add(addDisposable(mesh))
+    let mesh: THREE.Mesh
+    if (def.id === 'earth' && renderer) {
+      solarEarth = createRealisticEarth(renderer, radius, new THREE.Vector3(-1, 0.12, 0), {
+        segments: 64,
+        atmosphereScale: 1.075,
+        atmosphereStrength: 0.95,
+      })
+      solarEarth.surface.userData.disposeEarthTextures = solarEarth.disposeTextures
+      mesh = solarEarth.surface
+      root.add(addDisposable(solarEarth.surface))
+      root.add(addDisposable(solarEarth.atmosphere))
+    } else {
+      const map = loader.load(def.tex)
+      map.colorSpace = THREE.SRGBColorSpace
+      map.anisotropy = renderer?.capabilities.getMaxAnisotropy() ?? 8
+      const mat = new THREE.MeshPhongMaterial({
+        map,
+        color: 0xffffff,
+        shininess: 18,
+        specular: new THREE.Color(0x333333),
+        emissive: new THREE.Color(0xffffff),
+        emissiveMap: map,
+        emissiveIntensity: 0.32,
+      })
+      mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 32), mat)
+      root.add(addDisposable(mesh))
+    }
 
     if (def.ring) {
       // 主环约 1.1～2.3 倍赤道半径；略放宽以便课堂看清卡西尼缝与外环
@@ -1489,6 +1506,8 @@ function setMatOpacity(obj: THREE.Object3D, opacity: number) {
       const m = o.material as THREE.Material & { opacity?: number; transparent?: boolean }
       m.transparent = true
       m.opacity = opacity
+      const shader = m as THREE.ShaderMaterial
+      if (shader.uniforms?.globalOpacity) shader.uniforms.globalOpacity.value = opacity
       m.needsUpdate = true
     } else if (o instanceof THREE.Sprite) {
       ;(o.material as THREE.SpriteMaterial).opacity = opacity
@@ -1598,6 +1617,17 @@ function syncBodies(dt: number) {
     p.root.position.set(Math.cos(p.phase) * r, 0, -Math.sin(p.phase) * r)
     p.label.position.set(p.root.position.x, p.radius + 2.2, p.root.position.z)
     p.label.visible = true
+  }
+  if (solarEarth) {
+    const earthRuntime = planets.find((p) => p.def.id === 'earth')
+    if (earthRuntime) {
+      solarEarth.atmosphere.rotation.copy(earthRuntime.mesh.rotation)
+      earthRuntime.mesh.updateMatrixWorld(true)
+      const q = new THREE.Quaternion()
+      earthRuntime.mesh.getWorldQuaternion(q)
+      const toSun = earthRuntime.root.position.clone().negate().normalize().applyQuaternion(q.invert())
+      solarEarth.setSunDirection(toSun)
+    }
   }
 
   const hp = halleyPos(halleyPhase)
@@ -1775,7 +1805,7 @@ onUnmounted(() => {
           {{
             isGalaxy
               ? 'NASA 俯视盘 + 立体核球/旋臂点云 · 可斜视/侧视 · 课堂示意'
-              : '全天银道 · 亮星 BSC5 · 行星开源贴图 · 太阳 SDO/HMI · 课堂示意'
+              : '全天银道 · 亮星 BSC5 · 行星开源贴图 · 写实太阳贴图 · 课堂示意'
           }}
         </p>
       </aside>

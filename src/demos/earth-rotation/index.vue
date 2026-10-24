@@ -6,6 +6,12 @@ import * as d3 from 'd3'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
 import { Demo3, DemoHex, EarthDashDeg, EarthLineWidth } from '@/demos/theme'
 import { makeSunBillboard } from '@/engine/sunVisual'
+import {
+  configureEarthRenderer,
+  createRealisticEarth as createEarthModel,
+  type RealisticEarth,
+  type RealisticEarthOptions,
+} from '@/engine/realisticEarth'
 
 const props = defineProps<{
   stepId: string
@@ -242,6 +248,9 @@ let lastT = 0
 /** day-night | sphere | basics | timezones */
 let threeMode: 'day-night' | 'sphere' | 'basics' | 'timezones' | null = null
 let tzMarkerGroup: THREE.Group | null = null
+let tzEarthMaterial: THREE.ShaderMaterial | null = null
+let tzAtmosphereMaterial: THREE.ShaderMaterial | null = null
+let activeEarth: RealisticEarth | null = null
 let dateShipGroup: THREE.Group | null = null
 let dateShipMesh: THREE.Mesh | null = null
 let dateArrow: THREE.Mesh | null = null
@@ -320,6 +329,8 @@ function addDisposable(obj: THREE.Object3D) {
 }
 
 function disposeObj(obj: THREE.Object3D) {
+  const disposeTextures = obj.userData.disposeEarthTextures as (() => void) | undefined
+  disposeTextures?.()
   if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
     obj.geometry.dispose()
     const m = obj.material
@@ -371,6 +382,9 @@ function teardownThree() {
   sceneAmbient = null
   sceneFill = null
   tzMarkerGroup = null
+  tzEarthMaterial = null
+  tzAtmosphereMaterial = null
+  activeEarth = null
   dateShipGroup = null
   dateShipMesh = null
   dateArrow = null
@@ -491,6 +505,142 @@ function buildEarthSphere(R: number) {
   )
 }
 
+function addRealisticEarth(
+  parent: THREE.Object3D,
+  radius: number,
+  sunDirection: THREE.Vector3,
+  options: RealisticEarthOptions = {},
+) {
+  if (!renderer) return null
+  const model = createEarthModel(renderer, radius, sunDirection, options)
+  model.surface.userData.disposeEarthTextures = model.disposeTextures
+  parent.add(addDisposable(model.surface))
+  parent.add(addDisposable(model.atmosphere))
+  activeEarth = model
+  return model
+}
+
+/**
+ * 真实地球底层：按太阳方向混合 NASA 日景与夜间灯光。
+ * 使用物体局部法线，保证时区教学旋转镜头时，昼夜分界仍和经度保持一致。
+ */
+function buildRealisticEarth(R: number, sunDirection: THREE.Vector3) {
+  const loader = new THREE.TextureLoader()
+  const dayTex = loader.load('/textures/earth-blue-marble.jpg')
+  const nightTex = loader.load('/textures/earth-night.jpg')
+  dayTex.colorSpace = THREE.SRGBColorSpace
+  nightTex.colorSpace = THREE.SRGBColorSpace
+  if (renderer) {
+    const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+    dayTex.anisotropy = anisotropy
+    nightTex.anisotropy = anisotropy
+  }
+
+  tzEarthMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      dayMap: { value: dayTex },
+      nightMap: { value: nightTex },
+      sunDirection: { value: sunDirection.clone().normalize() },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vLocalNormal;
+      varying vec3 vViewNormal;
+      varying vec3 vViewPosition;
+      void main() {
+        vUv = uv;
+        vLocalNormal = normalize(normal);
+        vViewNormal = normalize(normalMatrix * normal);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D dayMap;
+      uniform sampler2D nightMap;
+      uniform vec3 sunDirection;
+      varying vec2 vUv;
+      varying vec3 vLocalNormal;
+      varying vec3 vViewNormal;
+      varying vec3 vViewPosition;
+
+      void main() {
+        vec3 dayColor = texture2D(dayMap, vUv).rgb;
+        vec3 nightColor = texture2D(nightMap, vUv).rgb;
+        float sunlight = dot(normalize(vLocalNormal), normalize(sunDirection));
+        float dayMix = smoothstep(-0.12, 0.18, sunlight);
+        float diffuse = 0.34 + 0.82 * max(sunlight, 0.0);
+
+        vec3 color = dayColor * diffuse * dayMix;
+        color += dayColor * 0.028 * (1.0 - dayMix);
+        color += nightColor * 1.35 * (1.0 - dayMix);
+
+        // 晨昏带的暖色散射，避免昼夜分界像硬切贴纸。
+        float twilight = (1.0 - smoothstep(0.0, 0.16, abs(sunlight))) * 0.22;
+        color += vec3(0.30, 0.085, 0.025) * twilight;
+
+        // 海洋在掠射角下的微弱高光。
+        vec3 viewDir = normalize(vViewPosition);
+        float rim = pow(1.0 - max(dot(normalize(vViewNormal), viewDir), 0.0), 3.2);
+        float ocean = smoothstep(0.015, 0.16, dayColor.b - dayColor.r);
+        color += vec3(0.08, 0.20, 0.32) * rim * ocean * dayMix * 0.42;
+
+        gl_FragColor = vec4(color, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `,
+  })
+
+  return new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), tzEarthMaterial)
+}
+
+/** 近地大气：视线切过球体边缘时增强，并在向阳面呈现蓝色散射。 */
+function buildAtmosphereShell(R: number, sunDirection: THREE.Vector3) {
+  tzAtmosphereMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      sunDirection: { value: sunDirection.clone().normalize() },
+    },
+    vertexShader: `
+      varying vec3 vLocalNormal;
+      varying vec3 vViewNormal;
+      varying vec3 vViewPosition;
+      void main() {
+        vLocalNormal = normalize(normal);
+        vViewNormal = normalize(normalMatrix * normal);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 sunDirection;
+      varying vec3 vLocalNormal;
+      varying vec3 vViewNormal;
+      varying vec3 vViewPosition;
+      void main() {
+        vec3 viewDir = normalize(vViewPosition);
+        float fresnel = pow(1.0 - max(dot(normalize(vViewNormal), viewDir), 0.0), 3.1);
+        float sunFacing = smoothstep(-0.32, 0.42, dot(normalize(vLocalNormal), normalize(sunDirection)));
+        float alpha = fresnel * (0.18 + 0.82 * sunFacing) * 0.88;
+        vec3 color = mix(vec3(0.035, 0.17, 0.42), vec3(0.20, 0.68, 1.0), sunFacing);
+        gl_FragColor = vec4(color, alpha);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.FrontSide,
+  })
+  const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(R * 1.045, 96, 72), tzAtmosphereMaterial)
+  atmosphere.name = 'tz-atmosphere'
+  atmosphere.renderOrder = 3
+  return atmosphere
+}
+
 function tubeMat(color: number, opacity = 1) {
   return new THREE.MeshBasicMaterial({
     color,
@@ -551,6 +701,8 @@ function makeEarthMeridian(lonDeg: number, R: number, tubeR: number, color: numb
 function addEarthAxisEquator(group: THREE.Group, R: number) {
   const axisLen = R * 2 + 40
   const axisR = EarthLineWidth.axis
+  const majorGuideR = EarthLineWidth.gridMajor * 0.58
+  const specialGuideR = EarthLineWidth.special * 0.7
   group.add(
     addDisposable(
       new THREE.Mesh(new THREE.CylinderGeometry(axisR, axisR, axisLen, 14), tubeMat(Demo3.earthAxis, 0.95)),
@@ -587,7 +739,7 @@ function addEarthAxisEquator(group: THREE.Group, R: number) {
   }
 
   // 本初子午线（亮）
-  group.add(addDisposable(makeEarthMeridian(0, R, EarthLineWidth.gridMajor, Demo3.earthPrime, 0.9)))
+  group.add(addDisposable(makeEarthMeridian(0, R, majorGuideR, Demo3.earthPrime, 0.9)))
   group.add(
     addDisposable(
       makeLabelSprite('本初子午', 4, 10, R + 8, { scale: 0.38, bg: false, color: DemoHex.earthPrime }),
@@ -595,7 +747,7 @@ function addEarthAxisEquator(group: THREE.Group, R: number) {
   )
 
   // 赤道（绿青，最醒目纬线）
-  group.add(addDisposable(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.92)))
+  group.add(addDisposable(makeEarthParallel(0, R, majorGuideR, Demo3.earthEquator, 0.92)))
   group.add(
     addDisposable(
       makeLabelSprite('赤道', R * 0.55, 5, R * 0.72, { scale: 0.4, bg: false, color: DemoHex.earthEquator }),
@@ -604,7 +756,7 @@ function addEarthAxisEquator(group: THREE.Group, R: number) {
 
   // 南北回归线 ±23.5°（虚线）
   for (const lat of [23.5, -23.5]) {
-    group.add(addDisposable(makeEarthDashedParallel(lat, R, EarthLineWidth.special, Demo3.earthTropic, 0.8)))
+    group.add(addDisposable(makeEarthDashedParallel(lat, R, specialGuideR, Demo3.earthTropic, 0.8)))
   }
   group.add(
     addDisposable(
@@ -627,7 +779,7 @@ function addEarthAxisEquator(group: THREE.Group, R: number) {
 
   // 南北极圈 ±66.5°（虚线）
   for (const lat of [66.5, -66.5]) {
-    group.add(addDisposable(makeEarthDashedParallel(lat, R, EarthLineWidth.special, Demo3.earthPolar, 0.72)))
+    group.add(addDisposable(makeEarthDashedParallel(lat, R, specialGuideR, Demo3.earthPolar, 0.72)))
   }
   group.add(
     addDisposable(
@@ -690,6 +842,7 @@ function initThreeCanvas(mode: 'day-night' | 'sphere' | 'basics' | 'timezones') 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(w, h, false)
+  configureEarthRenderer(renderer)
 
   controls = new OrbitControls(camera, canvas)
   controls.enableDamping = true
@@ -841,27 +994,10 @@ function setupBasicsDirection() {
     sceneAmbient.intensity = 0.55
   }
 
-  // 真彩底图（示意球），避免夜光贴图把赤道区压太暗
-  {
-    const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
-    tex.colorSpace = THREE.SRGBColorSpace
-    globeRoot.add(
-      addDisposable(
-        new THREE.Mesh(
-          new THREE.SphereGeometry(R, 72, 56),
-          new THREE.MeshPhongMaterial({ map: tex, shininess: 10, specular: new THREE.Color(0x223344) }),
-        ),
-      ),
-    )
-  }
-  globeRoot.add(
-    addDisposable(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(R + 2.4, 48, 32),
-        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.08, side: THREE.BackSide, depthWrite: false }),
-      ),
-    ),
-  )
+  addRealisticEarth(globeRoot, R, new THREE.Vector3(1, 0.18, 0.72), {
+    segments: 96,
+    atmosphereStrength: 0.78,
+  })
 
   // 地轴 + 经纬网 + 赤道/本初子午/回归线/极圈
   addEarthAxisEquator(globeRoot, R)
@@ -1096,16 +1232,11 @@ function setupBasicsPeriod() {
   periodEarthSpin = new THREE.Group()
   periodOrbitRoot.add(periodEarthSpin)
 
-  // 示意球用浅海真彩贴图 + Basic（不受夜光/暗光照拖累）
-  {
-    const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
-    tex.colorSpace = THREE.SRGBColorSpace
-    const earth = new THREE.Mesh(
-      new THREE.SphereGeometry(PERIOD_EARTH_R, 64, 48),
-      new THREE.MeshBasicMaterial({ map: tex }),
-    )
-    periodEarthSpin.add(addDisposable(earth))
-  }
+  addRealisticEarth(periodEarthSpin, PERIOD_EARTH_R, new THREE.Vector3(0, 1, 0.2), {
+    segments: 64,
+    atmosphereScale: 1.065,
+    atmosphereStrength: 0.82,
+  })
 
   periodSunLine = makePeriodLine(new THREE.Vector3(), new THREE.Vector3(1, 0, 0), 0xffb040, { opacity: 0.95 })
   scene.add(addDisposable(periodSunLine))
@@ -1125,6 +1256,11 @@ function syncPeriodScene() {
 
   periodEarthSpin.rotation.set(0, 0, periodSpinRad(p))
   periodOrbitRoot.updateMatrixWorld(true)
+  if (activeEarth) {
+    periodEarthSpin.getWorldQuaternion(_qTilt)
+    _vTmp.copy(pos).multiplyScalar(-1).normalize().applyQuaternion(_qTilt.clone().invert())
+    activeEarth.setSunDirection(_vTmp)
+  }
 
   if (periodSunLine) {
     periodSunLine.visible = periodKind.value !== 'sidereal'
@@ -1243,22 +1379,10 @@ function setupDayNight() {
   earthSpinRoot = new THREE.Group()
   earthTiltRoot.add(earthSpinRoot)
 
-  const earth = buildEarthSphere(R)
-  const mat = earth.material as THREE.MeshPhongMaterial
-  // 夜光克制，避免洗掉夜半球；昼侧靠平行光拉亮
-  mat.emissiveIntensity = 0.38
-  mat.shininess = 18
-  mat.specular = new THREE.Color(0x1a2838)
-  mat.color = new THREE.Color(0xffffff)
-  earthSpinRoot.add(addDisposable(earth))
-  earthSpinRoot.add(
-    addDisposable(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(R + 2.2, 48, 32),
-        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.08, side: THREE.BackSide, depthWrite: false }),
-      ),
-    ),
-  )
+  addRealisticEarth(earthSpinRoot, R, new THREE.Vector3(1, 0, 0), {
+    segments: 112,
+    atmosphereStrength: 0.86,
+  })
 
   addEarthAxisEquator(earthSpinRoot, R)
   addSpinDirectionArc(earthSpinRoot, R, 12)
@@ -1288,7 +1412,7 @@ function setupDayNight() {
         new THREE.MeshBasicMaterial({
           color: 0x02060f,
           transparent: true,
-          opacity: 0.5,
+          opacity: 0.08,
           depthWrite: false,
           side: THREE.DoubleSide,
         }),
@@ -1324,31 +1448,31 @@ function setupDayNight() {
   }
 
   terminatorGlow = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 0.55, EarthLineWidth.soft * 1.15, 14, 96),
-    tubeMat(Demo3.earthTerminatorSoft, 0.28),
+    new THREE.TorusGeometry(R + 0.45, EarthLineWidth.soft * 0.25, 10, 96),
+    tubeMat(Demo3.earthTerminatorSoft, 0.18),
   )
   terminatorGlow.rotation.y = Math.PI / 2
   termRoot.add(addDisposable(terminatorGlow))
 
   terminatorRing = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 0.5, EarthLineWidth.thin, 10, 128),
+    new THREE.TorusGeometry(R + 0.4, EarthLineWidth.hair * 0.75, 8, 128),
     tubeMat(Demo3.earthTerminator, 0.7),
   )
   terminatorRing.rotation.y = Math.PI / 2
   termRoot.add(addDisposable(terminatorRing))
 
-  // 晨 / 昏两段加粗异色弧，一眼能分出两条半圈
+  // 晨 / 昏两段异色弧：保留辨识度，避免粗环遮住地球贴图。
   dawnHighlight = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 1.6, EarthLineWidth.bold * 1.55, 10, 72, Math.PI),
-    tubeMat(Demo3.earthDawn, 1),
+    new THREE.TorusGeometry(R + 0.85, EarthLineWidth.hair, 8, 96, Math.PI),
+    tubeMat(Demo3.earthDawn, 0.9),
   )
   dawnHighlight.rotation.y = Math.PI / 2
   dawnHighlight.rotation.z = Math.PI / 2
   termRoot.add(addDisposable(dawnHighlight))
 
   duskHighlight = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 1.6, EarthLineWidth.bold * 1.55, 10, 72, Math.PI),
-    tubeMat(Demo3.earthDusk, 1),
+    new THREE.TorusGeometry(R + 0.85, EarthLineWidth.hair, 8, 96, Math.PI),
+    tubeMat(Demo3.earthDusk, 0.9),
   )
   duskHighlight.rotation.y = Math.PI / 2
   duskHighlight.rotation.z = -Math.PI / 2
@@ -1444,6 +1568,12 @@ function syncDayNightScene() {
   earthSpinRoot.rotation.y = spinFacingSun(localHour.value)
 
   _sunDir.set(0, 0, 0).sub(earthOrbitRoot.position).normalize()
+  if (activeEarth) {
+    earthSpinRoot.updateMatrixWorld(true)
+    earthSpinRoot.getWorldQuaternion(_qTilt)
+    _vTmp.copy(_sunDir).applyQuaternion(_qTilt.clone().invert())
+    activeEarth.setSunDirection(_vTmp)
+  }
   termRoot.position.copy(earthOrbitRoot.position)
   termRoot.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), _sunDir)
 
@@ -1606,13 +1736,10 @@ function setupSphereThrow() {
   scene.add(globeRoot)
 
   const R = sphereR
-  const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
-  tex.colorSpace = THREE.SRGBColorSpace
-  globeRoot.add(
-    addDisposable(
-      new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), new THREE.MeshBasicMaterial({ map: tex })),
-    ),
-  )
+  addRealisticEarth(globeRoot, R, new THREE.Vector3(1, 0.2, 0.65), {
+    segments: 80,
+    atmosphereStrength: 0.82,
+  })
 
   const axisLen = R * 2 + 24
   globeRoot.add(
@@ -2503,10 +2630,10 @@ function setupTimezones() {
   if (!initThreeCanvas('timezones') || !scene || !camera || !controls) return
   const R = TZ_EARTH_R
 
-  // Basic 贴图不受光照影响，避免夜半球被平行光打成全黑
+  // 昼夜由真实地球材质自行混合，环境光只保留给教学标注。
   if (sceneAmbient) {
-    sceneAmbient.color.set(0xffffff)
-    sceneAmbient.intensity = 0.55
+    sceneAmbient.color.set(0x334c68)
+    sceneAmbient.intensity = 0.18
   }
   if (sceneFill) {
     sceneFill.intensity = 0
@@ -2515,27 +2642,15 @@ function setupTimezones() {
   globeRoot = new THREE.Group()
   scene.add(globeRoot)
 
-  const tex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
-  tex.colorSpace = THREE.SRGBColorSpace
-  globeRoot.add(
-    addDisposable(
-      new THREE.Mesh(new THREE.SphereGeometry(R, 72, 56), new THREE.MeshBasicMaterial({ map: tex })),
-    ),
-  )
-
-  // 夜半球半透明罩（随 UTC 转），压暗但不抹掉地图
-  const nightShell = new THREE.Mesh(
-    new THREE.SphereGeometry(R + 0.35, 56, 40, -Math.PI / 2, Math.PI),
-    new THREE.MeshBasicMaterial({
-      color: 0x020814,
-      transparent: true,
-      opacity: 0.42,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  )
-  nightShell.name = 'tz-night'
-  globeRoot.add(addDisposable(nightShell))
+  const initialSunDirection = latLonToVec(0, 15 * (12 - tzUtcHour.value), 1)
+  const timeEarth = addRealisticEarth(globeRoot, R, initialSunDirection, {
+    segments: 128,
+    atmosphereStrength: 0,
+  })
+  // 时区教学图以边界辨识为主，不显示地球外侧的大气光膜。
+  if (timeEarth) timeEarth.atmosphere.visible = false
+  tzEarthMaterial = timeEarth?.surface.material ?? null
+  tzAtmosphereMaterial = timeEarth?.atmosphere.material ?? null
 
   // 赤道 + 本初子午（主框架）
   globeRoot.add(addDisposable(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.85)))
@@ -2545,14 +2660,16 @@ function setupTimezones() {
   )
 
   // 时区边界：中心经线 offset×15 的西界 = offset×15 − 7.5
+  const timezoneLineRadius = 0.09
+  const highlightedTimezoneLineRadius = 0.14
   for (let offset = -11; offset <= 12; offset++) {
     const centerLng = offset * 15
     const westLng = centerLng - 7.5
     const isCn = offset === 8 || offset === 9
     const isZero = offset === 0 || offset === 1
     const color = isCn ? 0xffd060 : isZero ? 0x6ec8f0 : 0xf0a020
-    const tube = isCn ? EarthLineWidth.special : EarthLineWidth.grid
-    const op = isCn ? 0.95 : 0.75
+    const tube = isCn ? highlightedTimezoneLineRadius : timezoneLineRadius
+    const op = isCn ? 0.78 : 0.48
     globeRoot.add(addDisposable(makeEarthMeridian(westLng, R, tube, color, op)))
 
     const label = offset === 0 ? 'UTC±0' : offset > 0 ? `UTC+${offset}` : `UTC${offset}`
@@ -2597,14 +2714,11 @@ function setupTimezones() {
   loopThree()
 }
 
-/** 夜罩默认盖本地 -X；转到 UTC 背日经线，半透明压暗即可 */
+/** 根据 UTC 更新太阳直射经线，真实材质会同步昼景、夜光与大气亮边。 */
 function syncTimezoneSun() {
-  if (!globeRoot) return
-  const night = globeRoot.getObjectByName('tz-night')
-  if (!night) return
   const subLon = 15 * (12 - tzUtcHour.value)
-  const nightLon = subLon + 180
-  night.rotation.set(0, (nightLon * Math.PI) / 180, 0)
+  const direction = latLonToVec(0, subLon, 1).normalize()
+  activeEarth?.setSunDirection(direction)
 }
 
 /** 镜头看向东八区（北京附近），保证首屏能看到地图与时区线 */

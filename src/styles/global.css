@@ -27,6 +27,15 @@
   --text-500: #8aa0b4;
   --text-400: #5c6e82;
 
+  /* 知识内容层级：深色面板与照片背景共用 */
+  --knowledge-title: #f4f8fc;
+  --knowledge-body: #d5e2ec;
+  --knowledge-muted: #a9bdcc;
+  --knowledge-faint: #8199ab;
+  --knowledge-active: #63b8ff;
+  --knowledge-data: #ffffff;
+  --knowledge-warm: #ffd88a;
+
   --border: #243044;
   --border-light: #1c2838;
 

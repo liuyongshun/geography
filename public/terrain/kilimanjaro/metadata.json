@@ -1,0 +1,37 @@
+{
+  "name": "Kilimanjaro high-detail teaching terrain",
+  "gridSize": 1025,
+  "bboxWGS84": [
+    37.23,
+    -3.18,
+    37.48,
+    -2.95
+  ],
+  "widthMeters": 27790,
+  "heightMeters": 25432,
+  "minElevation": 1607.09,
+  "maxElevation": 5885.877,
+  "officialSummitElevation": 5895.0,
+  "summitWGS84": [
+    37.3556,
+    -3.0674
+  ],
+  "verticalExaggeration": 1.8,
+  "heightEncoding": "little-endian uint16, normalized between minElevation and maxElevation",
+  "vegetationEncoding": "uint8 probability derived from imagery green index and 1550–3400 m forest envelope",
+  "terrainSource": "Mapzen Terrain Tiles on AWS Open Data; local source is SRTM",
+  "imagerySource": "EOxCloudless 2016, contains modified Copernicus Sentinel data 2016 & 2017",
+  "source": [
+    "https://registry.opendata.aws/terrain-tiles/",
+    "https://cloudless.eox.at/"
+  ],
+  "license": [
+    "Terrain source attribution required; underlying SRTM courtesy of USGS",
+    "EOxCloudless 2016: CC BY 4.0"
+  ],
+  "attribution": [
+    "Terrain data © Mapzen; SRTM terrain data courtesy of the U.S. Geological Survey",
+    "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017)"
+  ],
+  "disclaimer": "课堂三维原型；地形与影像来自公开数据，植被概率与自然带边界为教学可视化。"
+}

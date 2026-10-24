@@ -59,6 +59,7 @@ export class GlobeHost {
   private keyLight!: THREE.DirectionalLight
   private onPick: (id: HotspotId) => void
   private framed = false
+  private circulationActive = false
 
   /** 国家底图免责声明（countries 层加载后填充） */
   countriesDisclaimer = ''
@@ -97,7 +98,8 @@ export class GlobeHost {
     this.controls.minDistance = GLOBE_R * 1.6
     this.controls.maxDistance = GLOBE_R * 6
 
-    this.ambient = new THREE.AmbientLight(0x8eb6c8, 0.7)
+    // 教学预览优先保证地表可读，避免背光区压成纯黑。
+    this.ambient = new THREE.AmbientLight(0xb7cfdf, 0.92)
     this.scene.add(this.ambient)
     this.keyLight = new THREE.DirectionalLight(0xffffff, 1.1)
     this.keyLight.position.set(400, 120, 200)
@@ -193,6 +195,12 @@ export class GlobeHost {
     const { layers: _l, ...rest } = partial
     Object.assign(this.state, rest)
 
+    const nextCirculationActive = this.state.layers.circulation
+    if (nextCirculationActive !== this.circulationActive) {
+      this.circulationActive = nextCirculationActive
+      if (nextCirculationActive) this.frameCirculation()
+    }
+
     this.clipPlane.constant = this.state.sectioned ? 0 : GLOBE_R * 2
     this.sectionDisk.visible = this.state.sectioned
 
@@ -214,8 +222,8 @@ export class GlobeHost {
       this.ambient.intensity = 0.85
       this.keyLight.intensity = 0.45
     } else {
-      this.ambient.intensity = 0.45
-      this.keyLight.intensity = 1.25
+      this.ambient.intensity = 0.82
+      this.keyLight.intensity = 1.12
     }
 
     // 首次对准：ENSO 优先看赤道太平洋，否则政区看东亚
@@ -239,6 +247,9 @@ export class GlobeHost {
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(width, height, false)
+    if (this.circulationActive) {
+      this.frameCirculation()
+    }
   }
 
   dispose() {
@@ -269,6 +280,21 @@ export class GlobeHost {
   framePacific() {
     this.frameGeo(2, -160, 2.35)
     this.framed = true
+  }
+
+  /** 大气环流的全球教学镜头，按画布比例确保地球和标注完整入镜。 */
+  private frameCirculation() {
+    this.controls.target.set(0, 0, 0)
+    this.controls.enableRotate = true
+    // 三栏课堂布局下画布常为竖长形；按水平视野自动后退，保证地球和标注完整入镜。
+    const aspect = Math.max(0.35, this.camera.aspect)
+    const baseDistance = GLOBE_R * 3.3
+    const narrowDistance = GLOBE_R * 3.65 / aspect
+    const distance = Math.max(baseDistance, narrowDistance)
+    this.camera.position.set(0, 18, distance)
+    this.camera.up.set(0, 1, 0)
+    this.camera.lookAt(0, 0, 0)
+    this.controls.update()
   }
 
   private loop = () => {

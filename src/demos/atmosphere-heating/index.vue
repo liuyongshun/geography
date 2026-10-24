@@ -16,7 +16,7 @@ const mode = ref<'normal' | 'more'>('normal')
     </template>
 
     <g v-if="stepId === 'path'">
-      <circle cx="120" cy="90" r="36" :fill="DemoHex.lift" />
+      <image href="/textures/sun-realistic.png" x="78" y="48" width="84" height="84" />
       <text x="120" y="94" text-anchor="middle" class="lb">太阳</text>
       <path d="M0,400 H960 V540 H0 Z" :fill="DemoHex.ground" />
       <ellipse cx="480" cy="180" rx="280" ry="36" :fill="DemoHex.cloud" opacity="0.25" />

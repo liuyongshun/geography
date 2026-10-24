@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as d3 from 'd3'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
 import { DemoHex } from '@/demos/theme'
+import CesiumTerrain from './CesiumTerrain.vue'
+import CinematicTerrain from './CinematicTerrain.vue'
 
 const props = defineProps<{
   stepId: string
@@ -15,20 +17,20 @@ const H = 440
 
 /** 纬度地带：从赤道到极地（北半球示意）+ 大致纬度范围 */
 const LAT_BELTS = [
-  { name: '热带雨林', climate: '全年高温多雨', color: '#1f8a4a', trees: 'dense' as const, lat0: 0, lat1: 10, tip: '赤道低压控制 · 对流雨' },
-  { name: '热带草原', climate: '干湿季分明', color: '#7aab3a', trees: 'savanna' as const, lat0: 10, lat1: 20, tip: '赤道低压与信风交替' },
-  { name: '亚热带常绿', climate: '冬温夏热', color: '#3d9a55', trees: 'mixed' as const, lat0: 20, lat1: 35, tip: '副高与季风影响' },
-  { name: '温带落叶阔叶', climate: '四季分明', color: '#5a9a3a', trees: 'broad' as const, lat0: 35, lat1: 50, tip: '西风带 / 季风温带' },
-  { name: '亚寒带针叶', climate: '冬长严寒', color: '#2d6a45', trees: 'conifer' as const, lat0: 50, lat1: 65, tip: '大陆性冷湿' },
-  { name: '苔原', climate: '寒、短促暖季', color: '#7a9a8a', trees: 'tundra' as const, lat0: 65, lat1: 75, tip: '极地气团边缘' },
-  { name: '冰原', climate: '终年严寒', color: '#d0dce8', trees: 'ice' as const, lat0: 75, lat1: 90, tip: '极地高压 · 冰雪覆盖' },
+  { name: '热带雨林', climate: '全年高温多雨', color: '#1f8a4a', trees: 'dense' as const, lat0: 0, lat1: 10, tip: '赤道低压控制 · 对流雨', location: '菲律宾巴拉望', image: '/images/biomes/tropical-rainforest.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Palawan,_Philippines,_Tropical_rainforest.jpg', credit: 'Vyacheslav Argenberg · CC BY 4.0', plantName: '垂花赫蕉', plantImage: '/images/biomes/plants/plant-heliconia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Heliconia_rostrata_close_up.jpg', plantCredit: 'Rudra P. Dhua · CC BY-SA 4.0' },
+  { name: '热带草原', climate: '干湿季分明', color: '#7aab3a', trees: 'savanna' as const, lat0: 10, lat1: 20, tip: '赤道低压与信风交替', location: '南非萨比沙', image: '/images/biomes/tropical-savanna.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Savanna_landscape_at_Sabi_Sand.jpg', credit: 'Cosal · CC BY-SA 4.0', plantName: '伞形金合欢', plantImage: '/images/biomes/plants/plant-acacia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Vachellia_tortilis_kz04.jpg', plantCredit: 'Krzysztof Ziarnek · Wikimedia Commons' },
+  { name: '亚热带常绿', climate: '冬温夏热', color: '#3d9a55', trees: 'mixed' as const, lat0: 20, lat1: 35, tip: '副高与季风影响', location: '日本冲绳山原', image: '/images/biomes/subtropical-evergreen.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Subtropical_Forest_of_Yanbaru_National_Park_Okinawa_2018.jpg', credit: 'kohei sasabuchi · CC BY 2.0', plantName: '山茶', plantImage: '/images/biomes/plants/plant-camellia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Camellia-japonica.jpg', plantCredit: 'Nagahitoyuki · Wikimedia Commons' },
+  { name: '温带落叶阔叶', climate: '四季分明', color: '#5a9a3a', trees: 'broad' as const, lat0: 35, lat1: 50, tip: '西风带 / 季风温带', location: '美国北卡罗来纳', image: '/images/biomes/temperate-deciduous.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Central_North_Carolina_forest.jpg', credit: 'Sfoske70 · CC BY-SA 4.0', plantName: '欧洲栎', plantImage: '/images/biomes/plants/plant-oak.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Quercus_robur_acorns_and_leaves.jpg', plantCredit: 'Mannivu · Wikimedia Commons' },
+  { name: '亚寒带针叶', climate: '冬长严寒', color: '#2d6a45', trees: 'conifer' as const, lat0: 50, lat1: 65, tip: '大陆性冷湿', location: '加拿大魁北克', image: '/images/biomes/boreal-taiga.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Taiga_Landscape_in_Canada.jpg', credit: 'peupleloup · CC BY-SA 2.0', plantName: '黑云杉', plantImage: '/images/biomes/plants/plant-black-spruce.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Picea_mariana_cone.JPG', plantCredit: 'Tilo Podner · CC BY-SA 3.0' },
+  { name: '苔原', climate: '寒、短促暖季', color: '#7a9a8a', trees: 'tundra' as const, lat0: 65, lat1: 75, tip: '极地气团边缘', location: '加拿大伊瓦维克', image: '/images/biomes/tundra.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tundra_landscape_looking_south_toward_British_Mountains_near_Engigstciak,_Ivvavik_National_Park,_YT.jpg', credit: 'Daniel Case · CC BY-SA 3.0', plantName: '北极柳', plantImage: '/images/biomes/plants/plant-arctic-willow.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Salix_arctica_-_Arctic_willow.jpg', plantCredit: 'Wikimedia Commons · CC BY-SA 2.0' },
+  { name: '冰原', climate: '终年严寒', color: '#d0dce8', trees: 'ice' as const, lat0: 75, lat1: 90, tip: '极地高压 · 冰雪覆盖', location: '极地冰原景观', image: '/images/biomes/polar-ice.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Ice_landscape.jpg', credit: 'Gürkan Sengün · Public Domain', plantName: '南极发草', plantImage: '/images/biomes/plants/plant-antarctic-hair-grass.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:D._antarctica.jpg', plantCredit: 'Claurabert · Wikimedia Commons' },
 ]
 
 const LON_BELTS = [
-  { name: '森林', note: '降水较多', color: '#2f7a50', tip: '距海近 · 水汽充足' },
-  { name: '森林草原', note: '过渡', color: '#5a9a3a', tip: '半湿润过渡带' },
-  { name: '草原', note: '半干旱', color: '#aaba3a', tip: '降水减少 · 草本为主' },
-  { name: '荒漠', note: '干旱', color: '#c4a06a', tip: '深内陆 · 蒸发远大于降水' },
+  { name: '森林', note: '降水较多', color: '#2f7a50', tip: '距海近 · 水汽充足', location: '美国北卡罗来纳', image: '/images/biomes/temperate-deciduous.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Central_North_Carolina_forest.jpg', credit: 'Sfoske70 · CC BY-SA 4.0', plantName: '欧洲栎', plantImage: '/images/biomes/plants/plant-oak.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Quercus_robur_acorns_and_leaves.jpg', plantCredit: 'Mannivu · Wikimedia Commons' },
+  { name: '森林草原', note: '半湿润过渡', color: '#5a9a3a', tip: '林地与草地镶嵌分布', location: '俄罗斯阿尔泰边疆区', image: '/images/biomes/forest-steppe.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Forest_patches_in_steppe.jpg', credit: 'Kraulinn · CC BY-SA 3.0', plantName: '欧洲白桦', plantImage: '/images/biomes/plants/plant-birch.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Betula_pendula_leaves.jpg', plantCredit: 'Nefronus · CC0' },
+  { name: '草原', note: '半干旱', color: '#aaba3a', tip: '降水减少 · 草本为主', location: '俄罗斯顿河流域', image: '/images/biomes/temperate-grassland.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Steppe,_Grassland_plain,_Rostov-on-Don,_Russia.jpg', credit: 'Vyacheslav Argenberg · CC BY 4.0', plantName: '针茅', plantImage: '/images/biomes/plants/plant-feather-grass.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Stipa_capillata_kz07.jpg', plantCredit: 'Krzysztof Ziarnek · Wikimedia Commons' },
+  { name: '荒漠', note: '干旱', color: '#c4a06a', tip: '深内陆 · 蒸发远大于降水', location: '阿联酋沙迦沙漠', image: '/images/biomes/desert-dunes.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Desert_Dunes.jpg', credit: 'JSPhotography2016 · CC BY-SA 4.0', plantName: '梭梭', plantImage: '/images/biomes/plants/plant-saxaul.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Plante_Haloxylon_ammodendron.jpg', plantCredit: 'Zee AM · CC BY-SA 4.0' },
 ]
 
 const VERT_BELTS = [
@@ -46,6 +48,46 @@ const vertHi = ref(0)
 const hoverLat = ref<number | null>(null)
 const hoverLon = ref<number | null>(null)
 const hoverVert = ref<number | null>(null)
+const verticalView = ref<'cinematic' | 'terrain'>('cinematic')
+type LandscapePreview = {
+  name: string
+  detail: string
+  range: string
+  location: string
+  image: string
+  sourceUrl: string
+  credit: string
+  plantName: string
+  plantImage: string
+  plantSourceUrl: string
+  plantCredit: string
+}
+
+const openedBiome = ref<LandscapePreview | null>(null)
+
+function openBiome(index: number) {
+  latHi.value = index
+  const b = LAT_BELTS[index]
+  openedBiome.value = b
+    ? { name: b.name, detail: b.climate, range: `约 ${b.lat0}°–${b.lat1}°N`, location: b.location, image: b.image, sourceUrl: b.sourceUrl, credit: b.credit, plantName: b.plantName, plantImage: b.plantImage, plantSourceUrl: b.plantSourceUrl, plantCredit: b.plantCredit }
+    : null
+}
+
+function openLonBiome(index: number) {
+  lonHi.value = index
+  const b = LON_BELTS[index]
+  openedBiome.value = b
+    ? { name: b.name, detail: `${b.note} · ${b.tip}`, range: '中纬度沿海—内陆水分梯度', location: b.location, image: b.image, sourceUrl: b.sourceUrl, credit: b.credit, plantName: b.plantName, plantImage: b.plantImage, plantSourceUrl: b.plantSourceUrl, plantCredit: b.plantCredit }
+    : null
+}
+
+function closeBiome() {
+  openedBiome.value = null
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && openedBiome.value) closeBiome()
+}
 
 const mode = computed(() => {
   if (props.stepId === 'longitudinal') return 'longitudinal'
@@ -56,14 +98,14 @@ const mode = computed(() => {
 const hint = computed(() => {
   if (mode.value === 'latitudinal') {
     const b = LAT_BELTS[latHi.value]!
-    return `点色带 / 地球纬圈 · ${b.name}（约 ${b.lat0}°–${b.lat1}°N）· ${b.tip}`
+    return `${b.name}（约 ${b.lat0}°–${b.lat1}°N）· ${b.tip}`
   }
   if (mode.value === 'longitudinal') {
     const b = LON_BELTS[lonHi.value]!
-    return `点景观带 · ${b.name} · ${b.tip}`
+    return `${b.name} · ${b.tip}`
   }
   const b = VERT_BELTS[vertHi.value]!
-  return `点山带或图例 · ${b.name} · ${b.tip} · 垂直带≈纬度带压缩版`
+  return `${b.name} · ${b.tip} · 垂直带≈纬度带压缩版`
 })
 
 let disposed = false
@@ -201,7 +243,18 @@ function drawEarthDisc(
     .attr('stroke-dasharray', '4 3')
     .attr('opacity', 0.85)
   if (opts?.equatorLabel !== false) {
-    svg.append('text').attr('x', cx + r + 4).attr('y', ey + 3).attr('fill', DemoHex.lift).attr('font-size', 9).text('赤道')
+    svg
+      .append('text')
+      .attr('x', cx + r - 7)
+      .attr('y', ey + 3)
+      .attr('text-anchor', 'end')
+      .attr('fill', DemoHex.lift)
+      .attr('font-size', 9)
+      .attr('font-weight', 600)
+      .attr('paint-order', 'stroke')
+      .attr('stroke', DemoHex.canvas)
+      .attr('stroke-width', 2.5)
+      .text('赤道')
   }
 }
 
@@ -220,7 +273,9 @@ function drawLat() {
   svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ed-sky)').attr('rx', 12)
 
   svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('从赤道到两极的地域分异')
-  svg.append('text').attr('x', 24).attr('y', 42).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('主导因素：热量 · Blue Marble 示意 · 点色带或地球纬圈')
+  const latFactor = svg.append('text').attr('x', 24).attr('y', 42).attr('font-size', 10)
+  latFactor.append('tspan').attr('fill', DemoHex.inkDim).text('主导因素：')
+  latFactor.append('tspan').attr('fill', 'var(--knowledge-warm)').attr('font-weight', 700).text('热量')
 
   // 左侧地球（略右移，给纬度标注留空）
   const cx = 148
@@ -286,25 +341,17 @@ function drawLat() {
     .attr('font-size', 10)
     .text('北半球示意')
 
-  // 右侧色带列表 + 地面贴图条
+  // 右侧色带列表 + 真实植被照片
   const x0 = 268
   const y0 = 58
   const bw = 360
   const bh = 42
   const gap = 5
 
-  // 植被质感：用地面贴图作底层
-  defs
-    .append('pattern')
-    .attr('id', 'ed-ground')
-    .attr('patternUnits', 'userSpaceOnUse')
-    .attr('width', 120)
-    .attr('height', 48)
-    .append('image')
-    .attr('href', '/textures/weather/ground-color.jpg')
-    .attr('width', 120)
-    .attr('height', 48)
-    .attr('preserveAspectRatio', 'xMidYMid slice')
+  const photoShade = defs.append('linearGradient').attr('id', 'ed-photo-shade').attr('x1', '0').attr('y1', '0').attr('x2', '1').attr('y2', '0')
+  photoShade.append('stop').attr('offset', '0%').attr('stop-color', '#07121c').attr('stop-opacity', 0.96)
+  photoShade.append('stop').attr('offset', '58%').attr('stop-color', '#07121c').attr('stop-opacity', 0.72)
+  photoShade.append('stop').attr('offset', '100%').attr('stop-color', '#07121c').attr('stop-opacity', 0.12)
 
   const nLat = LAT_BELTS.length
   LAT_BELTS.forEach((b, i) => {
@@ -325,14 +372,32 @@ function drawLat() {
         latHi.value = i
       })
 
+    defs
+      .append('clipPath')
+      .attr('id', `ed-biome-card-${i}`)
+      .append('rect')
+      .attr('x', x0)
+      .attr('y', y)
+      .attr('width', bw)
+      .attr('height', bh)
+      .attr('rx', 8)
+
+    g.append('image')
+      .attr('href', b.image)
+      .attr('x', x0)
+      .attr('y', y)
+      .attr('width', bw)
+      .attr('height', bh)
+      .attr('preserveAspectRatio', 'xMidYMid slice')
+      .attr('clip-path', `url(#ed-biome-card-${i})`)
+
     g.append('rect')
       .attr('x', x0)
       .attr('y', y)
       .attr('width', bw)
       .attr('height', bh)
       .attr('rx', 8)
-      .attr('fill', 'url(#ed-ground)')
-      .attr('opacity', on ? 0.55 : 0.25)
+      .attr('fill', 'url(#ed-photo-shade)')
 
     g.append('rect')
       .attr('x', x0)
@@ -341,7 +406,7 @@ function drawLat() {
       .attr('height', bh)
       .attr('rx', 8)
       .attr('fill', b.color)
-      .attr('opacity', on ? 0.78 : hov ? 0.58 : 0.4)
+      .attr('fill-opacity', on ? 0.24 : hov ? 0.16 : 0.08)
       .attr('stroke', on ? DemoHex.ink : hov ? DemoHex.inkMuted : 'transparent')
       .attr('stroke-width', on ? 2 : 1.2)
       .attr('class', on ? 'ed-pulse' : null)
@@ -349,7 +414,7 @@ function drawLat() {
     g.append('text')
       .attr('x', x0 + 14)
       .attr('y', y + 18)
-      .attr('fill', i >= 5 ? '#1a2430' : DemoHex.ink)
+      .attr('fill', '#fff')
       .attr('font-size', 12)
       .attr('font-weight', 600)
       .attr('style', 'pointer-events:none')
@@ -357,13 +422,27 @@ function drawLat() {
     g.append('text')
       .attr('x', x0 + 14)
       .attr('y', y + 34)
-      .attr('fill', i >= 5 ? '#3a4a58' : '#e0f0e8')
+      .attr('fill', '#dce8ef')
       .attr('font-size', 10)
       .attr('style', 'pointer-events:none')
       .text(`${b.climate} · ${b.lat0}°–${b.lat1}°N`)
 
-    const treeG = g.append('g').attr('opacity', on ? 1 : 0.6).attr('style', 'pointer-events:none')
-    drawTreeGlyph(treeG, x0 + bw - 72, y + bh - 6, b.trees, i >= 5)
+    g.append('title').text(`${b.name} · ${b.location}`)
+
+    const preview = g
+      .append('g')
+      .attr('transform', `translate(${x0 + bw - 23}, ${y + bh / 2})`)
+      .attr('role', 'button')
+      .attr('aria-label', `预览${b.name}大图`)
+      .style('cursor', 'zoom-in')
+      .on('click', (event: MouseEvent) => {
+        event.stopPropagation()
+        openBiome(i)
+      })
+    preview.append('circle').attr('r', 11).attr('fill', 'rgba(4, 15, 24, 0.76)').attr('stroke', 'rgba(255, 255, 255, 0.72)').attr('stroke-width', 1)
+    preview.append('circle').attr('cx', -1.5).attr('cy', -1.5).attr('r', 3.5).attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 1.4)
+    preview.append('line').attr('x1', 1.2).attr('y1', 1.2).attr('x2', 5.5).attr('y2', 5.5).attr('stroke', '#fff').attr('stroke-width', 1.6).attr('stroke-linecap', 'round')
+    preview.append('title').text(`预览${b.name}实景大图`)
 
     // 连线到地球
     if (on) {
@@ -382,29 +461,20 @@ function drawLat() {
     }
   })
 
-  // 热量：赤道高、向极地递减（箭头从下往上）
+  // 热量：赤道高、向极地递减；渐变条顶部直接收成箭头。
   const listBottom = y0 + nLat * (bh + gap) - 8
   const heatX = 652
   const heatGrad = defs.append('linearGradient').attr('id', 'ed-heat-bar').attr('x1', '0').attr('y1', '1').attr('x2', '0').attr('y2', '0')
   heatGrad.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.warm)
   heatGrad.append('stop').attr('offset', '100%').attr('stop-color', '#8ec8e8')
   svg
-    .append('rect')
-    .attr('x', heatX - 4)
-    .attr('y', y0 + 8)
-    .attr('width', 6)
-    .attr('height', listBottom - (y0 + 8))
-    .attr('rx', 3)
+    .append('path')
+    .attr(
+      'd',
+      `M ${heatX} ${y0 + 8} L ${heatX + 10} ${y0 + 19} L ${heatX + 4} ${y0 + 19} L ${heatX + 4} ${listBottom} L ${heatX - 4} ${listBottom} L ${heatX - 4} ${y0 + 19} L ${heatX - 10} ${y0 + 19} Z`,
+    )
     .attr('fill', 'url(#ed-heat-bar)')
     .attr('opacity', 0.9)
-  svg
-    .append('path')
-    .attr('d', `M ${heatX} ${listBottom} L ${heatX} ${y0 + 22}`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.warm)
-    .attr('stroke-width', 2.2)
-    .attr('marker-end', 'url(#ed-heat)')
-    .attr('class', 'ed-flow')
   svg.append('text').attr('x', heatX + 12).attr('y', y0 + 18).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('极地')
   svg
     .append('text')
@@ -425,7 +495,7 @@ function drawLat() {
     .attr('y', 412)
     .attr('fill', DemoHex.inkMuted)
     .attr('font-size', 11)
-    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  沿纬线延伸、随纬度更替  ·  底图 Blue Marble + 地表贴图`)
+    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  沿纬线延伸、随纬度更替`)
 }
 
 function drawLon() {
@@ -443,7 +513,9 @@ function drawLon() {
   svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ed-lsky)').attr('rx', 12)
 
   svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('从沿海到内陆的地域分异')
-  svg.append('text').attr('x', 24).attr('y', 42).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('主导因素：水分 · 中纬度大陆示意 · 点色带或地球经向带')
+  const lonFactor = svg.append('text').attr('x', 24).attr('y', 42).attr('font-size', 10)
+  lonFactor.append('tspan').attr('fill', DemoHex.inkDim).text('主导因素：')
+  lonFactor.append('tspan').attr('fill', 'var(--knowledge-active)').attr('font-weight', 700).text('水分')
 
   // 左侧地球：西侧海洋 → 东侧内陆，竖向水分带
   const cx = 148
@@ -556,20 +628,14 @@ function drawLon() {
   const bh = 56
   const gap = 10
 
-  defs
-    .append('pattern')
-    .attr('id', 'ed-lon-ground')
-    .attr('patternUnits', 'userSpaceOnUse')
-    .attr('width', 120)
-    .attr('height', 56)
-    .append('image')
-    .attr('href', '/textures/weather/ground-color.jpg')
-    .attr('width', 120)
-    .attr('height', 56)
-    .attr('preserveAspectRatio', 'xMidYMid slice')
+  const lonPhotoShade = defs.append('linearGradient').attr('id', 'ed-lon-photo-shade').attr('x1', '0').attr('y1', '0').attr('x2', '1').attr('y2', '0')
+  lonPhotoShade.append('stop').attr('offset', '0%').attr('stop-color', '#07121c').attr('stop-opacity', 0.96)
+  lonPhotoShade.append('stop').attr('offset', '58%').attr('stop-color', '#07121c').attr('stop-opacity', 0.72)
+  lonPhotoShade.append('stop').attr('offset', '100%').attr('stop-color', '#07121c').attr('stop-opacity', 0.12)
 
   LON_BELTS.forEach((b, i) => {
-    const y = y0 + i * (bh + gap)
+    // 沿海在下、内陆在上，与右侧降水递减箭头保持同一阅读方向。
+    const y = y0 + (nLon - 1 - i) * (bh + gap)
     const on = hi === i
     const hov = soft === i
     const g = svg
@@ -585,14 +651,32 @@ function drawLon() {
         lonHi.value = i
       })
 
+    defs
+      .append('clipPath')
+      .attr('id', `ed-lon-card-${i}`)
+      .append('rect')
+      .attr('x', x0)
+      .attr('y', y)
+      .attr('width', bw)
+      .attr('height', bh)
+      .attr('rx', 8)
+
+    g.append('image')
+      .attr('href', b.image)
+      .attr('x', x0)
+      .attr('y', y)
+      .attr('width', bw)
+      .attr('height', bh)
+      .attr('preserveAspectRatio', 'xMidYMid slice')
+      .attr('clip-path', `url(#ed-lon-card-${i})`)
+
     g.append('rect')
       .attr('x', x0)
       .attr('y', y)
       .attr('width', bw)
       .attr('height', bh)
       .attr('rx', 8)
-      .attr('fill', 'url(#ed-lon-ground)')
-      .attr('opacity', on ? 0.55 : 0.25)
+      .attr('fill', 'url(#ed-lon-photo-shade)')
 
     g.append('rect')
       .attr('x', x0)
@@ -601,7 +685,7 @@ function drawLon() {
       .attr('height', bh)
       .attr('rx', 8)
       .attr('fill', b.color)
-      .attr('opacity', on ? 0.78 : hov ? 0.58 : 0.4)
+      .attr('fill-opacity', on ? 0.24 : hov ? 0.16 : 0.08)
       .attr('stroke', on ? DemoHex.ink : hov ? DemoHex.inkMuted : 'transparent')
       .attr('stroke-width', on ? 2 : 1.2)
       .attr('class', on ? 'ed-pulse' : null)
@@ -622,27 +706,22 @@ function drawLon() {
       .attr('style', 'pointer-events:none')
       .text(`${b.note} · ${b.tip}`)
 
-    // 简易景观符号
-    const ix = x0 + bw - 70
-    const iy = y + bh - 10
-    const icon = g.append('g').attr('opacity', on ? 1 : 0.65).attr('style', 'pointer-events:none')
-    if (i === 0) {
-      icon.append('line').attr('x1', ix + 8).attr('x2', ix + 8).attr('y1', iy).attr('y2', iy - 16).attr('stroke', '#5a4030').attr('stroke-width', 2)
-      icon.append('circle').attr('cx', ix + 8).attr('cy', iy - 22).attr('r', 9).attr('fill', '#0e2818')
-      icon.append('line').attr('x1', ix + 28).attr('x2', ix + 28).attr('y1', iy).attr('y2', iy - 14).attr('stroke', '#5a4030').attr('stroke-width', 2)
-      icon.append('circle').attr('cx', ix + 28).attr('cy', iy - 20).attr('r', 8).attr('fill', '#0e2818')
-    } else if (i === 1) {
-      icon.append('line').attr('x1', ix + 10).attr('x2', ix + 10).attr('y1', iy).attr('y2', iy - 14).attr('stroke', '#5a4030').attr('stroke-width', 2)
-      icon.append('circle').attr('cx', ix + 10).attr('cy', iy - 20).attr('r', 8).attr('fill', '#0e2818')
-      icon.append('rect').attr('x', ix + 22).attr('y', iy - 8).attr('width', 22).attr('height', 5).attr('rx', 2).attr('fill', '#6a8a3a')
-    } else if (i === 2) {
-      icon.append('rect').attr('x', ix + 4).attr('y', iy - 8).attr('width', 40).attr('height', 6).attr('rx', 2).attr('fill', '#8aaa3a')
-      icon.append('rect').attr('x', ix + 10).attr('y', iy - 14).attr('width', 28).attr('height', 4).attr('rx', 2).attr('fill', '#aaba4a')
-    } else {
-      icon.append('ellipse').attr('cx', ix + 24).attr('cy', iy - 6).attr('rx', 22).attr('ry', 8).attr('fill', '#c4a06a')
-      icon.append('circle').attr('cx', ix + 14).attr('cy', iy - 14).attr('r', 2).attr('fill', '#d8c090')
-      icon.append('circle').attr('cx', ix + 30).attr('cy', iy - 18).attr('r', 1.6).attr('fill', '#d8c090')
-    }
+    g.append('title').text(`${b.name} · ${b.location}`)
+
+    const preview = g
+      .append('g')
+      .attr('transform', `translate(${x0 + bw - 23}, ${y + bh / 2})`)
+      .attr('role', 'button')
+      .attr('aria-label', `预览${b.name}大图`)
+      .style('cursor', 'zoom-in')
+      .on('click', (event: MouseEvent) => {
+        event.stopPropagation()
+        openLonBiome(i)
+      })
+    preview.append('circle').attr('r', 11).attr('fill', 'rgba(4, 15, 24, 0.76)').attr('stroke', 'rgba(255, 255, 255, 0.72)').attr('stroke-width', 1)
+    preview.append('circle').attr('cx', -1.5).attr('cy', -1.5).attr('r', 3.5).attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 1.4)
+    preview.append('line').attr('x1', 1.2).attr('y1', 1.2).attr('x2', 5.5).attr('y2', 5.5).attr('stroke', '#fff').attr('stroke-width', 1.6).attr('stroke-linecap', 'round')
+    preview.append('title').text(`预览${b.name}实景大图`)
 
     if (on) {
       const gx = landL + i * stripW + stripW * 0.5
@@ -660,30 +739,21 @@ function drawLon() {
     }
   })
 
-  // 水分：沿海高 → 内陆低（箭头向下）
+  // 水分：从下方沿海向上方内陆递减，渐变条顶部收成箭头。
   const listBottom = y0 + nLon * (bh + gap) - 8
   const moistX = 652
-  const moistGrad = defs.append('linearGradient').attr('id', 'ed-moist-bar').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
+  const moistGrad = defs.append('linearGradient').attr('id', 'ed-moist-bar').attr('x1', '0').attr('y1', '1').attr('x2', '0').attr('y2', '0')
   moistGrad.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.cold)
   moistGrad.append('stop').attr('offset', '100%').attr('stop-color', '#c4a06a')
   svg
-    .append('rect')
-    .attr('x', moistX - 4)
-    .attr('y', y0 + 8)
-    .attr('width', 6)
-    .attr('height', listBottom - (y0 + 8))
-    .attr('rx', 3)
+    .append('path')
+    .attr(
+      'd',
+      `M ${moistX} ${y0 + 8} L ${moistX + 10} ${y0 + 19} L ${moistX + 4} ${y0 + 19} L ${moistX + 4} ${listBottom} L ${moistX - 4} ${listBottom} L ${moistX - 4} ${y0 + 19} L ${moistX - 10} ${y0 + 19} Z`,
+    )
     .attr('fill', 'url(#ed-moist-bar)')
     .attr('opacity', 0.9)
-  svg
-    .append('path')
-    .attr('d', `M ${moistX} ${y0 + 18} L ${moistX} ${listBottom - 6}`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.cold)
-    .attr('stroke-width', 2.2)
-    .attr('marker-end', 'url(#ed-rain)')
-    .attr('class', 'ed-flow')
-  svg.append('text').attr('x', moistX + 12).attr('y', y0 + 18).attr('fill', DemoHex.coldSoft).attr('font-size', 10).text('沿海')
+  svg.append('text').attr('x', moistX + 12).attr('y', y0 + 18).attr('fill', '#c4a06a').attr('font-size', 10).text('内陆')
   svg
     .append('text')
     .attr('x', moistX + 12)
@@ -692,7 +762,7 @@ function drawLon() {
     .attr('font-size', 10)
     .attr('font-weight', 600)
     .text('降水递减')
-  svg.append('text').attr('x', moistX + 12).attr('y', listBottom).attr('fill', '#c4a06a').attr('font-size', 10).text('内陆')
+  svg.append('text').attr('x', moistX + 12).attr('y', listBottom).attr('fill', DemoHex.coldSoft).attr('font-size', 10).text('沿海')
 
   const cur = LON_BELTS[hi]!
   svg.append('rect').attr('x', 24).attr('y', 388).attr('width', W - 48).attr('height', 40).attr('rx', 8).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
@@ -702,175 +772,9 @@ function drawLon() {
     .attr('y', 412)
     .attr('fill', DemoHex.inkMuted)
     .attr('font-size', 11)
-    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  沿经线方向更替、大致与海岸平行  ·  底图 Blue Marble`)
+    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  沿经线方向更替、大致与海岸平行`)
 }
 
-function drawVert() {
-  const el = svgRef.value
-  if (!el) return
-  const svg = d3.select(el)
-  svg.selectAll('*').remove()
-  const defs = svg.append('defs')
-  ensureAnim(defs)
-  marker(defs, 'ed-alt', DemoHex.lift)
-
-  const sky = defs.append('linearGradient').attr('id', 'ed-vsky').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
-  sky.append('stop').attr('offset', '0%').attr('stop-color', '#1a3048')
-  sky.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.canvas)
-  svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ed-vsky)').attr('rx', 12)
-
-  svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('山地垂直地域分异')
-  svg.append('text').attr('x', 24).attr('y', 42).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('水热随海拔变化 · 垂直带 ≈「赤道→两极」压缩版 · 点山带或图例')
-
-  // 右侧小地球对照
-  drawEarthDisc(svg, defs, 680, 160, 58)
-  svg.append('text').attr('x', 680).attr('y', 232).attr('text-anchor', 'middle').attr('fill', DemoHex.inkDim).attr('font-size', 9).text('对照纬度带')
-
-  const hi = vertHi.value
-  // 在小地球上标对应纬度带（垂直带 i 对应 LAT 大致 i）
-  const mapIdx = Math.min(LAT_BELTS.length - 1, hi === 5 ? 6 : hi === 4 ? 5 : hi)
-  const lb = LAT_BELTS[mapIdx]!
-  const cy = 160
-  const r = 58
-  const y0e = globeLatY(cy, r, lb.lat1)
-  const y1e = globeLatY(cy, r, lb.lat0)
-  svg
-    .append('g')
-    .attr('clip-path', 'url(#ed-globe-clip)')
-    .append('rect')
-    .attr('x', 680 - r)
-    .attr('y', Math.min(y0e, y1e))
-    .attr('width', r * 2)
-    .attr('height', Math.max(4, Math.abs(y1e - y0e)))
-    .attr('fill', lb.color)
-    .attr('opacity', 0.55)
-    .attr('class', 'ed-pulse')
-
-  // 山体
-  const peakX = 260
-  const baseY = 372
-  const peakY = 72
-  const totalH = baseY - peakY
-
-  defs
-    .append('pattern')
-    .attr('id', 'ed-rock')
-    .attr('patternUnits', 'userSpaceOnUse')
-    .attr('width', 160)
-    .attr('height', 120)
-    .append('image')
-    .attr('href', '/textures/rocks/sedimentary-color.jpg')
-    .attr('width', 160)
-    .attr('height', 120)
-    .attr('preserveAspectRatio', 'xMidYMid slice')
-
-  // 山体底（岩石贴图）
-  svg
-    .append('path')
-    .attr('d', `M 48 ${baseY} L ${peakX} ${peakY} L 480 ${baseY} Z`)
-    .attr('fill', 'url(#ed-rock)')
-    .attr('opacity', 0.85)
-  svg
-    .append('path')
-    .attr('d', `M 48 ${baseY} L ${peakX} ${peakY} L 480 ${baseY} Z`)
-    .attr('fill', '#1a2838')
-    .attr('opacity', 0.35)
-
-  let acc = 0
-  VERT_BELTS.forEach((b, i) => {
-    const y1 = peakY + acc * totalH
-    acc += b.h
-    const y2 = peakY + acc * totalH
-    const on = hi === i
-    const hov = hoverVert.value === i
-    const t1 = (y1 - peakY) / totalH
-    const t2 = (y2 - peakY) / totalH
-    const left1 = peakX - (peakX - 48) * t1
-    const right1 = peakX + (480 - peakX) * t1
-    const left2 = peakX - (peakX - 48) * t2
-    const right2 = peakX + (480 - peakX) * t2
-    const g = svg
-      .append('g')
-      .style('cursor', 'pointer')
-      .on('mouseenter', () => {
-        hoverVert.value = i
-      })
-      .on('mouseleave', () => {
-        if (hoverVert.value === i) hoverVert.value = null
-      })
-      .on('click', () => {
-        vertHi.value = i
-      })
-    g.append('path')
-      .attr('d', `M ${left1} ${y1} L ${right1} ${y1} L ${right2} ${y2} L ${left2} ${y2} Z`)
-      .attr('fill', b.color)
-      .attr('opacity', on ? 0.88 : hov ? 0.68 : 0.48)
-      .attr('stroke', on ? DemoHex.ink : hov ? DemoHex.inkMuted : 'rgba(255,255,255,0.15)')
-      .attr('stroke-width', on ? 2.2 : 0.8)
-      .attr('class', on ? 'ed-glow' : null)
-
-    // 图例
-    const lx = 520
-    const ly = 78 + i * 46
-    g.append('rect')
-      .attr('x', lx)
-      .attr('y', ly)
-      .attr('width', 88)
-      .attr('height', 36)
-      .attr('rx', 7)
-      .attr('fill', b.color)
-      .attr('opacity', on ? 0.95 : 0.5)
-      .attr('stroke', on ? DemoHex.ink : 'transparent')
-      .attr('stroke-width', 1.5)
-    g.append('text')
-      .attr('x', lx + 8)
-      .attr('y', ly + 22)
-      .attr('fill', i === VERT_BELTS.length - 1 ? '#1a2430' : DemoHex.ink)
-      .attr('font-size', 10)
-      .attr('font-weight', on ? 600 : 500)
-      .attr('style', 'pointer-events:none')
-      .text(b.name)
-  })
-
-  // 雪帽
-  svg
-    .append('path')
-    .attr('d', `M ${peakX - 30} ${peakY + 38} L ${peakX} ${peakY} L ${peakX + 30} ${peakY + 38} Z`)
-    .attr('fill', '#f2f6fa')
-    .attr('opacity', 0.92)
-    .attr('class', 'ed-bob')
-
-  svg
-    .append('path')
-    .attr('d', `M 36 ${baseY} L 36 ${peakY + 12}`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.lift)
-    .attr('stroke-width', 2)
-    .attr('marker-end', 'url(#ed-alt)')
-    .attr('class', 'ed-flow')
-  svg.append('text').attr('x', 28).attr('y', 220).attr('fill', DemoHex.lift).attr('font-size', 10).attr('transform', 'rotate(-90,28,220)').text('海拔升高')
-
-  // 对照连线
-  svg
-    .append('path')
-    .attr('d', `M 500 ${78 + hi * 46 + 18} L 620 ${globeLatY(160, 58, (lb.lat0 + lb.lat1) / 2)}`)
-    .attr('fill', 'none')
-    .attr('stroke', DemoHex.sink)
-    .attr('stroke-width', 1.6)
-    .attr('stroke-dasharray', '5 4')
-    .attr('class', 'ed-flow')
-    .attr('opacity', 0.8)
-
-  const cur = VERT_BELTS[hi]!
-  svg.append('rect').attr('x', 24).attr('y', 388).attr('width', W - 48).attr('height', 40).attr('rx', 8).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
-  svg
-    .append('text')
-    .attr('x', 40)
-    .attr('y', 412)
-    .attr('fill', DemoHex.inkMuted)
-    .attr('font-size', 11)
-    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  对照地球上「${lb.name}」  ·  山体岩石贴图 ambientCG`)
-}
 
 function drawTreeGlyph(
   g: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -910,12 +814,13 @@ function drawTreeGlyph(
 
 function redraw() {
   if (disposed) return
+  if (mode.value === 'vertical') return
   if (mode.value === 'longitudinal') drawLon()
-  else if (mode.value === 'vertical') drawVert()
   else drawLat()
 }
 
 watch([() => props.stepId], () => {
+  closeBiome()
   requestAnimationFrame(redraw)
 })
 
@@ -925,36 +830,143 @@ watch([latHi, lonHi, vertHi, hoverLat, hoverLon, hoverVert], () => {
 
 onMounted(() => {
   disposed = false
+  window.addEventListener('keydown', handleKeydown)
   redraw()
 })
 onUnmounted(() => {
   disposed = true
+  window.removeEventListener('keydown', handleKeydown)
   if (svgRef.value) d3.select(svgRef.value).selectAll('*').remove()
 })
 </script>
 
 <template>
-  <div class="wrap">
+  <div v-if="mode === 'vertical'" class="vertical-stage">
+    <div class="vertical-tabs" role="tablist" aria-label="垂直自然带场景模式">
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="verticalView === 'cinematic'"
+        :class="{ active: verticalView === 'cinematic' }"
+        @click="verticalView = 'cinematic'"
+      >
+        <span>沉浸式 2.5D</span>
+        <small>照片级教学场景</small>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="verticalView === 'terrain'"
+        :class="{ active: verticalView === 'terrain' }"
+        @click="verticalView = 'terrain'"
+      >
+        <span>真实地形 3D</span>
+        <small>Cesium 自由浏览</small>
+      </button>
+    </div>
+    <CinematicTerrain v-if="verticalView === 'cinematic'" />
+    <CesiumTerrain v-else />
+  </div>
+  <div v-else class="wrap">
     <div class="toolbar">
       <span class="hint">{{ hint }}</span>
       <template v-if="mode === 'latitudinal'">
         <button type="button" class="chip" @click="latHi = (latHi + 1) % LAT_BELTS.length">上一带（向极）</button>
         <button type="button" class="chip" @click="latHi = (latHi + LAT_BELTS.length - 1) % LAT_BELTS.length">下一带（向赤）</button>
       </template>
-      <template v-else-if="mode === 'longitudinal'">
+      <template v-else>
         <button type="button" class="chip" @click="lonHi = (lonHi + LON_BELTS.length - 1) % LON_BELTS.length">上一带</button>
         <button type="button" class="chip" @click="lonHi = (lonHi + 1) % LON_BELTS.length">下一带</button>
-      </template>
-      <template v-else>
-        <button type="button" class="chip" @click="vertHi = (vertHi + VERT_BELTS.length - 1) % VERT_BELTS.length">上一带</button>
-        <button type="button" class="chip" @click="vertHi = (vertHi + 1) % VERT_BELTS.length">下一带</button>
       </template>
     </div>
     <svg ref="svgRef" class="canvas" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet" />
   </div>
+  <Teleport to="body">
+    <Transition name="biome-lightbox">
+      <div
+        v-if="openedBiome"
+        class="biome-lightbox"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`${openedBiome.name}典型植被实景大图`"
+        @click.self="closeBiome"
+      >
+        <figure class="biome-lightbox__figure">
+          <button class="biome-lightbox__close" type="button" aria-label="关闭大图" @click="closeBiome">×</button>
+          <div class="biome-lightbox__gallery">
+            <div class="biome-lightbox__media">
+              <img :src="openedBiome.image" :alt="`${openedBiome.name}典型景观，拍摄地：${openedBiome.location}`" />
+              <span>自然带景观</span>
+            </div>
+            <div class="biome-lightbox__media">
+              <img :src="openedBiome.plantImage" :alt="`${openedBiome.name}典型植物：${openedBiome.plantName}`" />
+              <span>典型植物 · {{ openedBiome.plantName }}</span>
+            </div>
+          </div>
+          <figcaption>
+            <div>
+              <strong>{{ openedBiome.name }}</strong>
+              <span>{{ openedBiome.detail }} · {{ openedBiome.range }}</span>
+            </div>
+            <div class="biome-lightbox__meta">
+              <span>实景地点：{{ openedBiome.location }}</span>
+              <a :href="openedBiome.sourceUrl" target="_blank" rel="noreferrer">景观图：{{ openedBiome.credit }}</a>
+              <a :href="openedBiome.plantSourceUrl" target="_blank" rel="noreferrer">植物图：{{ openedBiome.plantCredit }}</a>
+            </div>
+          </figcaption>
+        </figure>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
+.vertical-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  overflow: hidden;
+  background: #06111d;
+}
+.vertical-tabs {
+  position: absolute;
+  z-index: 40;
+  top: 16px;
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(169 209 235 / 22%);
+  border-radius: 13px;
+  background: rgb(7 22 37 / 84%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 24%);
+  backdrop-filter: blur(14px);
+}
+.vertical-tabs button {
+  display: grid;
+  min-width: 134px;
+  gap: 2px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  color: #a9bdcb;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.vertical-tabs button.active {
+  color: #fff;
+  background: linear-gradient(180deg, #3f9ddd, #226faa);
+  box-shadow: 0 4px 14px rgb(25 130 207 / 32%);
+}
+.vertical-tabs span { font-size: 12px; font-weight: 700; }
+.vertical-tabs small { font-size: 9px; opacity: .78; }
+@media (max-width: 760px) {
+  .vertical-tabs { top: 10px; }
+  .vertical-tabs button { min-width: 112px; padding: 7px 9px; }
+}
 .wrap {
   height: 100%;
   display: flex;
@@ -989,5 +1001,125 @@ onUnmounted(() => {
   flex: 1;
   width: 100%;
   min-height: 320px;
+}
+.biome-lightbox {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 4vw, 56px);
+  background: rgb(1 8 14 / 88%);
+  backdrop-filter: blur(12px);
+}
+.biome-lightbox__figure {
+  position: relative;
+  width: min(1080px, 100%);
+  max-height: 92vh;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(198 226 240 / 26%);
+  border-radius: 18px;
+  background: #07131e;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 55%);
+}
+.biome-lightbox__gallery {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  height: min(64vh, 650px);
+  background: #02080d;
+}
+.biome-lightbox__media {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.biome-lightbox__media + .biome-lightbox__media {
+  border-left: 1px solid rgb(198 226 240 / 18%);
+}
+.biome-lightbox__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #02080d;
+}
+.biome-lightbox__media > span {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  padding: 5px 9px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  color: #f4f8fc;
+  background: rgb(3 12 19 / 76%);
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+.biome-lightbox__figure figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 20px 18px;
+  color: #eaf5fb;
+}
+.biome-lightbox__figure figcaption > div {
+  display: grid;
+  gap: 4px;
+}
+.biome-lightbox__figure strong {
+  font-size: 18px;
+}
+.biome-lightbox__figure span,
+.biome-lightbox__figure a {
+  color: #9fb9c8;
+  font-size: 12px;
+}
+.biome-lightbox__figure a:hover {
+  color: #d8f0ff;
+}
+.biome-lightbox__meta {
+  text-align: right;
+}
+.biome-lightbox__close {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgb(255 255 255 / 32%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(3 12 19 / 72%);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.biome-lightbox-enter-active,
+.biome-lightbox-leave-active {
+  transition: opacity 180ms ease;
+}
+.biome-lightbox-enter-active .biome-lightbox__figure,
+.biome-lightbox-leave-active .biome-lightbox__figure {
+  transition: transform 180ms ease;
+}
+.biome-lightbox-enter-from,
+.biome-lightbox-leave-to {
+  opacity: 0;
+}
+.biome-lightbox-enter-from .biome-lightbox__figure,
+.biome-lightbox-leave-to .biome-lightbox__figure {
+  transform: translateY(10px) scale(.98);
+}
+@media (max-width: 680px) {
+  .biome-lightbox { padding: 12px; }
+  .biome-lightbox__gallery { grid-template-columns: 1fr; height: 68vh; }
+  .biome-lightbox__media + .biome-lightbox__media { border-top: 1px solid rgb(198 226 240 / 18%); border-left: 0; }
+  .biome-lightbox__figure figcaption { align-items: start; flex-direction: column; gap: 10px; }
+  .biome-lightbox__meta { text-align: left; }
 }
 </style>

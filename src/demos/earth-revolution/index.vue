@@ -6,6 +6,7 @@ import * as d3 from 'd3'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
 import { monthLabel, subsolarLatitude } from '@/engine/atmosphere'
 import { makeSunBillboard } from '@/engine/sunVisual'
+import { configureEarthRenderer, createRealisticEarth, type RealisticEarth } from '@/engine/realisticEarth'
 
 const props = defineProps<{
   stepId: string
@@ -105,6 +106,7 @@ let tiltAnim = 1
 let tiltPhase = 0
 /** 平行光波纹相位 */
 let rayPhase = 0
+let realisticEarth: RealisticEarth | null = null
 /** 上次写入角度标签的度数，避免每帧重建 Sprite */
 let lastAngleDeg = -1
 const _toSun = new THREE.Vector3()
@@ -117,6 +119,8 @@ function addDisposable(obj: THREE.Object3D) {
 }
 
 function disposeObj(obj: THREE.Object3D) {
+  const disposeTextures = obj.userData.disposeEarthTextures as (() => void) | undefined
+  disposeTextures?.()
   if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {
     obj.geometry.dispose()
     const m = obj.material
@@ -264,6 +268,7 @@ function setupScene() {
   renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(w, h, false)
+  configureEarthRenderer(renderer)
 
   controls = new OrbitControls(camera, canvasRef.value)
   controls.enableDamping = true
@@ -409,27 +414,13 @@ function setupScene() {
   earthSpinRoot = new THREE.Group()
   earthGroup.add(earthSpinRoot)
 
-  const dayTex = new THREE.TextureLoader().load('/textures/earth-period.jpg')
-  dayTex.colorSpace = THREE.SRGBColorSpace
-  const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(R, 72, 56),
-    new THREE.MeshPhongMaterial({
-      map: dayTex,
-      shininess: 12,
-      specular: new THREE.Color(0x223344),
-    }),
-  )
-  earthSpinRoot.add(addDisposable(earth))
-
-  // 大气
-  earthSpinRoot.add(
-    addDisposable(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(R + 2.4, 48, 32),
-        new THREE.MeshBasicMaterial({ color: 0x6eb6ff, transparent: true, opacity: 0.1, side: THREE.BackSide, depthWrite: false }),
-      ),
-    ),
-  )
+  realisticEarth = createRealisticEarth(renderer, R, new THREE.Vector3(-1, 0, 0), {
+    segments: 112,
+    atmosphereStrength: 0.86,
+  })
+  realisticEarth.surface.userData.disposeEarthTextures = realisticEarth.disposeTextures
+  earthSpinRoot.add(addDisposable(realisticEarth.surface))
+  earthSpinRoot.add(addDisposable(realisticEarth.atmosphere))
 
   // 地轴（沿本地 +Y）
   axisGroup = new THREE.Group()
@@ -581,6 +572,11 @@ function updateOverlays() {
 
   earthOrbitRoot.updateMatrixWorld(true)
   earthGroup.updateMatrixWorld(true)
+  if (realisticEarth) {
+    earthSpinRoot.updateMatrixWorld(true)
+    earthSpinRoot.getWorldQuaternion(_qTilt)
+    realisticEarth.setSunDirection(_toSun.clone().applyQuaternion(_qTilt.clone().invert()))
+  }
   const worldHit = subsolarDot.position.clone()
   earthGroup.localToWorld(worldHit)
   // _toSun：地球→太阳；从太阳朝地球射出
@@ -795,6 +791,7 @@ function teardown() {
   earthOrbitRoot = null
   earthGroup = null
   earthSpinRoot = null
+  realisticEarth = null
   axisGroup = null
   ecliptic = null
   eclipticEdge = null

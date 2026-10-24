@@ -7,7 +7,7 @@ import { defaultLayerMap } from '@/engine/globe'
  */
 export const TUTORIAL_LAYER_BINDINGS: Record<string, LayerId[]> = {
   // 已上线：气压带风带
-  'atmosphere-belts-winds': ['pressure', 'circulation', 'sun'],
+  'atmosphere-belts-winds': ['pressure', 'circulation'],
 
   // 选必1 · 地球运动
   'earth-rotation': ['sun', 'terminator', 'timezones', 'latlon', 'degrees'],

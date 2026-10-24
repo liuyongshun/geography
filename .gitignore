@@ -34,6 +34,7 @@ Thumbs.db
 # Coverage / TS
 coverage
 *.tsbuildinfo
+.cache/
 
 # Tauri / Rust
 src-tauri/target

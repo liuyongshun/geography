@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import curriculumJson from '@content/curriculum/xiangjiao.json'
 import { findTutorial, firstTutorialInGrade, type Curriculum, type Tutorial } from '@/curriculum/types'
 import { getDemo } from '@/curriculum/demoRegistry'
+import UtilityMenu from './UtilityMenu.vue'
 
 const curriculum = curriculumJson as Curriculum
 const route = useRoute()
@@ -11,6 +12,7 @@ const router = useRouter()
 
 const activeGradeId = ref<string | null>(curriculum.grades[0]?.id ?? null)
 const openBooks = ref<string[]>([])
+const collapsed = ref(false)
 
 const activeGrade = computed(() => {
   const id = activeGradeId.value
@@ -86,14 +88,33 @@ function bookStats(bookId: string) {
   }
   return { ready, total }
 }
+
+function toggleCollapsed() {
+  collapsed.value = !collapsed.value
+}
 </script>
 
 <template>
-  <aside class="nav">
+  <aside class="nav" :class="{ collapsed }">
     <div class="brand">
-      <p class="edition">{{ curriculum.edition }}</p>
-      <h2>地理过程教程</h2>
-      <p class="pub">{{ curriculum.publisher }}</p>
+      <div v-if="!collapsed" class="brand-copy">
+        <p class="edition">{{ curriculum.edition }}</p>
+        <p class="pub">{{ curriculum.publisher }}</p>
+      </div>
+      <div class="brand-actions">
+        <UtilityMenu align="left" />
+        <button
+          type="button"
+          class="collapse-btn"
+          :aria-label="collapsed ? '展开主导航' : '收起主导航'"
+          :title="collapsed ? '展开主导航' : '收起主导航'"
+          @click="toggleCollapsed"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path :d="collapsed ? 'M7 4l6 6-6 6' : 'M13 4l-6 6 6 6'" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div class="grades">
@@ -103,14 +124,14 @@ function bookStats(bookId: string) {
         type="button"
         class="grade"
         :class="{ on: g.id === activeGradeId }"
+        :title="g.label"
         @click="selectGrade(g.id)"
       >
-        {{ g.label }}
+        <span v-if="!collapsed">{{ g.label }}</span>
+        <span v-else>{{ g.label.replace('高', '') }}</span>
       </button>
     </div>
-    <p class="grade-sum">{{ activeGrade.summary }}</p>
-
-    <div class="books">
+    <div v-show="!collapsed" class="books">
       <section v-for="book in activeGrade.books" :key="book.id" class="book">
         <button type="button" class="book-hd" @click="toggleBook(book.id)">
           <span>
@@ -153,15 +174,24 @@ function bookStats(bookId: string) {
   width: 236px;
   flex-shrink: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  transition: width 0.22s ease;
+}
+.nav.collapsed {
+  width: 62px;
 }
 .brand {
+  position: relative;
+  min-height: 58px;
   padding: 10px 10px 8px;
   border-bottom: 1px solid var(--border);
+}
+.brand-copy {
+  padding-right: 58px;
 }
 .edition {
   margin: 0;
@@ -179,11 +209,62 @@ function bookStats(bookId: string) {
   font-size: 11px;
   color: var(--text-400);
 }
+.brand-actions {
+  position: absolute;
+  z-index: 20;
+  top: 9px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.brand-actions :deep(.menu-trigger),
+.collapse-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+.collapse-btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  color: var(--text-500);
+  background: var(--bg-subtle);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+.collapse-btn:hover {
+  color: var(--knowledge-active);
+  border-color: rgba(99, 184, 255, 0.45);
+  background: rgba(99, 184, 255, 0.09);
+}
+.collapse-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.collapsed .brand {
+  min-height: 42px;
+  padding-inline: 5px;
+}
+.collapsed .brand-actions {
+  right: 5px;
+}
 .grades {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 8px 8px 0;
+}
+.collapsed .grades {
+  grid-template-columns: 1fr;
+  gap: 7px;
+  padding: 8px 9px 0;
 }
 .grade {
   border: 1px solid var(--border);
@@ -201,11 +282,11 @@ function bookStats(bookId: string) {
   color: var(--primary-mid);
   box-shadow: var(--glow-teal);
 }
-.grade-sum {
-  margin: 6px 8px 2px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--text-400);
+.collapsed .grade {
+  height: 38px;
+  padding: 0;
+  font-size: 12px;
+  border-radius: 9px;
 }
 .books {
   padding: 4px 6px 12px;
