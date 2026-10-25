@@ -42,6 +42,11 @@ export const router = createRouter({
           component: () => import('@/views/GeoLab/index.vue'),
           props: true,
         },
+        {
+          path: 'leaderboard',
+          name: 'leaderboard',
+          component: () => import('@/views/Leaderboard/index.vue'),
+        },
       ],
     },
     { path: '/courses', redirect: { name: 'resources' } },

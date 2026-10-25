@@ -554,12 +554,12 @@
                 {
                   "id": "xx1-c5-s1",
                   "title": "第一节 自然环境的整体性",
-                  "tutorials": [{ "id": "env-integrity", "title": "地理环境整体性案例", "status": "ready", "kind": "case", "minutes": 12, "objectives": ["用要素相互作用解释环境变化"] }]
+                  "tutorials": [{ "id": "env-integrity", "title": "自然环境要素联系与整体响应", "status": "ready", "kind": "case", "minutes": 16, "objectives": ["识别大气、水、土壤、生物、岩石及地貌等自然环境要素", "说明要素间通过物质迁移和能量交换形成有机整体", "说明自然环境具有整体功能、统一演化和区域间联系", "结合森林流域案例分析一个要素变化引起的整体响应", "评价人类活动对自然环境整体功能的影响"] }]
                 },
                 {
                   "id": "xx1-c5-s2",
                   "title": "第二节 自然环境的地域差异性",
-                  "tutorials": [{ "id": "env-differentiation", "title": "从赤道到两极与垂直地域分异", "status": "ready", "kind": "compare", "minutes": 16, "objectives": ["区分三种地域分异规律"] }]
+                  "tutorials": [{ "id": "env-differentiation", "title": "水平、垂直与地方性地域分异", "status": "ready", "kind": "compare", "minutes": 20, "objectives": ["说明地域差异具有不同空间尺度", "比较纬度地带性与干湿度地带性分异的主导因素和更替方向", "分析山地垂直地域分异与水热条件、基带、坡向的关系", "结合局地地形、气候和地面组成物质解释地方性分异"] }]
                 }
               ]
             }

@@ -1,389 +1,279 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import * as d3 from 'd3'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
 import { DemoHex } from '@/demos/theme'
 
-const props = defineProps<{
-  stepId: string
-  demo: DemoEntry
-}>()
+const props = defineProps<{ stepId: string; demo: DemoEntry }>()
+const mount = ref<HTMLDivElement | null>(null)
+const rain = ref(68)
+const forest = ref(82)
+const playing = ref(true)
+const isElements = computed(() => props.stepId === 'elements')
+const runoff = computed(() => Math.round(rain.value * (1.48 - forest.value / 150)))
+const erosion = computed(() => Math.min(100, Math.round(rain.value * (1.55 - forest.value / 115))))
+const riverLevel = computed(() => Math.min(98, Math.round(19 + runoff.value * 0.72)))
+const stateName = computed(() => (forest.value > 65 ? '林冠完整' : forest.value > 35 ? '斑块退化' : '植被破坏'))
+const stateCopy = computed(() => (forest.value > 65
+  ? '林冠截留降雨，枯落物与根系帮助雨水下渗，河流涨水较缓。'
+  : forest.value > 35
+    ? '林地破碎，部分坡面开始形成快速径流与轻微沟蚀。'
+    : '裸露坡面直接承受雨滴打击，径流夹带泥沙，洪峰明显抬升。'))
 
-const svgRef = ref<SVGSVGElement | null>(null)
-const W = 780
-const H = 440
-
-type ElemId = 'climate' | 'water' | 'landform' | 'soil' | 'bio'
-
-const ELEMS: Array<{
-  id: ElemId
-  name: string
-  hint: string
-  fill: string
-  x: number
-  y: number
-}> = [
-  { id: 'climate', name: '气候', hint: '水热条件', fill: DemoHex.cold, x: 390, y: 86 },
-  { id: 'water', name: '水文', hint: '径流 · 地下水', fill: '#4cc9f0', x: 590, y: 190 },
-  { id: 'landform', name: '地貌', hint: '侵蚀 · 堆积', fill: DemoHex.sink, x: 520, y: 350 },
-  { id: 'soil', name: '土壤', hint: '成土 · 肥力', fill: '#c45c26', x: 260, y: 350 },
-  { id: 'bio', name: '生物', hint: '植被 · 动物', fill: '#5cb87a', x: 190, y: 190 },
+const elements = [
+  { id: 'air', name: '大气', copy: '热量、降水与气体交换', color: DemoHex.air },
+  { id: 'water', name: '水', copy: '蒸发、降水、径流与下渗', color: DemoHex.water },
+  { id: 'soil', name: '土壤', copy: '储水、供肥并承接风化产物', color: DemoHex.soil },
+  { id: 'life', name: '生物', copy: '改变水分、养分与地表覆盖', color: DemoHex.vegetation },
+  { id: 'rock', name: '岩石及地貌', copy: '提供物质基础并控制地表过程', color: DemoHex.rock },
 ]
 
-const LINKS: Array<{ from: ElemId; to: ElemId; label: string }> = [
-  { from: 'climate', to: 'water', label: '降水补给' },
-  { from: 'climate', to: 'bio', label: '水热控制' },
-  { from: 'climate', to: 'soil', label: '风化速率' },
-  { from: 'water', to: 'landform', label: '侵蚀搬运' },
-  { from: 'water', to: 'bio', label: '水分供应' },
-  { from: 'bio', to: 'soil', label: '有机质' },
-  { from: 'bio', to: 'climate', label: '蒸腾调节' },
-  { from: 'soil', to: 'bio', label: '养分支撑' },
-  { from: 'landform', to: 'climate', label: '地形降水' },
-  { from: 'landform', to: 'water', label: '汇流路径' },
-  { from: 'soil', to: 'water', label: '下渗蓄水' },
-  { from: 'water', to: 'soil', label: '淋溶淀积' },
-]
+let renderer: THREE.WebGLRenderer | null
+let scene: THREE.Scene | null
+let camera: THREE.PerspectiveCamera | null
+let controls: OrbitControls | null
+let resizeObserver: ResizeObserver | null
+let raf = 0
+let rainPoints: THREE.Points | null
+let rainPositions: Float32Array | null
+let trees: THREE.Group | null
+let water: THREE.Mesh | null
+let ground: THREE.MeshStandardMaterial | null
+const clock = new THREE.Clock()
+const h = (x: number, z: number) => Math.sin(x * 0.16) * 1.8 + Math.cos(z * 0.19) * 1.2 + Math.sin((x + z) * 0.08) * 2.8 + Math.min(11, Math.abs(x) * 0.38 + Math.abs(z) * 0.055) - Math.exp(-(x * x) / 78) * 6.8 - 2.6
 
-const active = ref<ElemId>('bio')
-const broken = ref(false)
-
-const isChain = computed(() => props.stepId === 'chain')
-
-function ensureAnim(defs: d3.Selection<SVGDefsElement, unknown, null, undefined>) {
-  if (!defs.select('#ei-anim').empty()) return
-  defs
-    .append('style')
-    .attr('id', 'ei-anim')
-    .text(`
-      .ei-flow { stroke-dasharray: 8 12; animation: ei-dash 3.6s linear infinite; }
-      .ei-flow-dim { stroke-dasharray: 6 16; animation: ei-dash 5.2s linear infinite; opacity: 0.22; }
-      .ei-pulse { animation: ei-pulse 3.2s ease-in-out infinite; }
-      .ei-bob { animation: ei-bob 4s ease-in-out infinite; }
-      .ei-fall { animation: ei-fall 2.4s linear infinite; }
-      .ei-wilt { animation: ei-wilt 3.6s ease-in-out infinite; }
-      @keyframes ei-dash { to { stroke-dashoffset: -40; } }
-      @keyframes ei-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
-      @keyframes ei-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-      @keyframes ei-fall { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 16; } }
-      @keyframes ei-wilt { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.9; } }
-    `)
-}
-
-function marker(defs: d3.Selection<SVGDefsElement, unknown, null, undefined>, id: string, color: string) {
-  defs
-    .append('marker')
-    .attr('id', id)
-    .attr('viewBox', '0 0 10 10')
-    .attr('refX', 8)
-    .attr('refY', 5)
-    .attr('markerWidth', 5)
-    .attr('markerHeight', 5)
-    .attr('orient', 'auto')
-    .append('path')
-    .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-    .attr('fill', color)
-}
-
-function relatedOf(id: ElemId) {
-  return LINKS.filter((e) => e.from === id || e.to === id)
-}
-
-function drawElements() {
-  const el = svgRef.value
-  if (!el) return
-  const svg = d3.select(el)
-  svg.selectAll('*').remove()
-  const defs = svg.append('defs')
-  ensureAnim(defs)
-  marker(defs, 'ei-on', DemoHex.coldSoft)
-  marker(defs, 'ei-off', DemoHex.inkFaint)
-
-  svg.append('rect').attr('width', W).attr('height', H).attr('fill', DemoHex.canvas).attr('rx', 12)
-  svg.append('text').attr('x', 24).attr('y', 28).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('五大要素相互制约')
-  svg.append('text').attr('x', 24).attr('y', 46).attr('fill', DemoHex.inkDim).attr('font-size', 10).text('点某一要素，看它牵动哪些联系')
-
-  const cx = 390
-  const cy = 230
-  svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 46).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
-  svg.append('text').attr('x', cx).attr('y', cy - 4).attr('text-anchor', 'middle').attr('fill', DemoHex.ink).attr('font-size', 11).attr('font-weight', 600).text('整体性')
-  svg.append('text').attr('x', cx).attr('y', cy + 14).attr('text-anchor', 'middle').attr('fill', DemoHex.inkDim).attr('font-size', 10).text('牵一发而动全身')
-
-  const hi = active.value
-  const rel = relatedOf(hi)
-  const by = Object.fromEntries(ELEMS.map((n) => [n.id, n]))
-
-  for (const e of LINKS) {
-    const a = by[e.from]
-    const b = by[e.to]
-    if (!a || !b) continue
-    const on = rel.some((r) => r.from === e.from && r.to === e.to)
-    const mx = (a.x + b.x) / 2
-    const my = (a.y + b.y) / 2
-    svg
-      .append('line')
-      .attr('x1', a.x)
-      .attr('y1', a.y)
-      .attr('x2', b.x)
-      .attr('y2', b.y)
-      .attr('stroke', on ? '#6ec8f0' : '#24344c')
-      .attr('stroke-width', on ? 2.2 : 1)
-      .attr('marker-end', on ? 'url(#ei-on)' : 'url(#ei-off)')
-      .attr('class', on ? 'ei-flow' : 'ei-flow-dim')
-    if (on) {
-      svg
-        .append('text')
-        .attr('x', mx)
-        .attr('y', my - 7)
-        .attr('text-anchor', 'middle')
-        .attr('fill', DemoHex.rain)
-        .attr('font-size', 10)
-        .text(e.label)
-    }
+function texture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 128
+  const context = canvas.getContext('2d')!
+  const gradient = context.createLinearGradient(0, 0, 128, 128)
+  gradient.addColorStop(0, DemoHex.vegetation)
+  gradient.addColorStop(1, DemoHex.groundDark)
+  context.fillStyle = gradient
+  context.fillRect(0, 0, 128, 128)
+  for (let i = 0; i < 1100; i += 1) {
+    context.fillStyle = `rgba(184,210,151,${Math.random() * 0.24})`
+    context.fillRect(Math.random() * 128, Math.random() * 128, 1, 1)
   }
-
-  for (const n of ELEMS) {
-    const linked = n.id === hi || rel.some((r) => r.from === n.id || r.to === n.id)
-    const g = svg.append('g').style('cursor', 'pointer').on('click', () => {
-      active.value = n.id
-    })
-    g.append('circle')
-      .attr('cx', n.x)
-      .attr('cy', n.y)
-      .attr('r', n.id === hi ? 38 : 32)
-      .attr('fill', n.fill)
-      .attr('opacity', linked ? 0.95 : 0.28)
-      .attr('stroke', n.id === hi ? DemoHex.ink : 'transparent')
-      .attr('stroke-width', 2)
-      .attr('class', n.id === hi ? 'ei-pulse' : null)
-    g.append('text')
-      .attr('x', n.x)
-      .attr('y', n.y + 4)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#fff')
-      .attr('font-size', 11)
-      .attr('font-weight', 600)
-      .text(n.name)
-  }
-
-  const cur = ELEMS.find((n) => n.id === hi)!
-  svg.append('rect').attr('x', 24).attr('y', 392).attr('width', 732).attr('height', 32).attr('rx', 6).attr('fill', DemoHex.panel).attr('stroke', DemoHex.inkFaint)
-  svg.append('text').attr('x', 40).attr('y', 412).attr('fill', cur.fill).attr('font-size', 10).attr('font-weight', 600).text(cur.name)
-  svg.append('text').attr('x', 88).attr('y', 412).attr('fill', DemoHex.inkDim).attr('font-size', 10).text(`${cur.hint}  ·  变化会通过箭头传到其余要素`)
+  const result = new THREE.CanvasTexture(canvas)
+  result.wrapS = result.wrapT = THREE.RepeatWrapping
+  result.repeat.set(7, 7)
+  result.colorSpace = THREE.SRGBColorSpace
+  return result
 }
 
-function drawChain() {
-  const el = svgRef.value
-  if (!el) return
-  const svg = d3.select(el)
-  svg.selectAll('*').remove()
-  const defs = svg.append('defs')
-  ensureAnim(defs)
-  marker(defs, 'ei-bad', DemoHex.warm)
-  marker(defs, 'ei-ok', '#7dd3a0')
+function terrain() {
+  const geometry = new THREE.PlaneGeometry(54, 62, 80, 80)
+  geometry.rotateX(-Math.PI / 2)
+  const position = geometry.attributes.position
+  for (let i = 0; i < position.count; i += 1) position.setY(i, h(position.getX(i), position.getZ(i)))
+  geometry.computeVertexNormals()
+  ground = new THREE.MeshStandardMaterial({ map: texture(), roughness: 0.96 })
+  const mesh = new THREE.Mesh(geometry, ground)
+  mesh.receiveShadow = true
+  scene!.add(mesh)
+}
 
-  const sky = defs.append('linearGradient').attr('id', 'ei-sky').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
-  sky.append('stop').attr('offset', '0%').attr('stop-color', broken.value ? '#1a1420' : '#0d1a28')
-  sky.append('stop').attr('offset', '100%').attr('stop-color', broken.value ? '#241820' : '#070b16')
-
-  svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ei-sky)').attr('rx', 12)
-  svg.append('text').attr('x', 24).attr('y', 28).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('案例：森林破坏')
-  svg
-    .append('text')
-    .attr('x', 24)
-    .attr('y', 46)
-    .attr('fill', DemoHex.inkDim)
-    .attr('font-size', 10)
-    .text(broken.value ? '生物减少 → 气候变干、径流暴涨、土壤流失、地貌侵蚀加重' : '植被完好：涵养水源、调节气候、保护土壤')
-
-  // 地面
-  svg
-    .append('path')
-    .attr('d', broken.value ? 'M 20 328 C 140 318, 260 342, 400 326 C 540 308, 660 338, 760 322 L 760 420 L 20 420 Z' : 'M 20 328 C 160 318, 280 322, 420 320 C 560 318, 660 324, 760 320 L 760 420 L 20 420 Z')
-    .attr('fill', broken.value ? '#3a2a22' : DemoHex.ground)
-
-  // 河
-  const riverY = broken.value ? 338 : 332
-  svg
-    .append('path')
-    .attr('d', `M 0 ${riverY} C 180 ${riverY + (broken.value ? 18 : 6)}, 360 ${riverY - 4}, 780 ${riverY + 8}`)
-    .attr('fill', 'none')
-    .attr('stroke', broken.value ? '#7aa0b8' : '#4cc9f0')
-    .attr('stroke-width', broken.value ? 16 : 10)
-    .attr('opacity', 0.85)
-    .attr('class', 'ei-flow')
-
-  // 树
-  const trees = [
-    [80, 318],
-    [130, 322],
-    [190, 316],
-    [250, 324],
-    [320, 318],
-    [390, 322],
-    [460, 316],
-    [530, 324],
-  ] as const
-  trees.forEach(([x, y], i) => {
-    if (broken.value && i % 2 === 0) {
-      svg.append('line').attr('x1', x).attr('x2', x).attr('y1', y).attr('y2', y - 10).attr('stroke', '#5a4030').attr('stroke-width', 3)
-      svg.append('circle').attr('cx', x + 8).attr('cy', y - 4).attr('r', 4).attr('fill', '#6a5040').attr('opacity', 0.7)
-      return
-    }
-    if (broken.value) return
-    const g = svg.append('g').attr('class', 'ei-bob').attr('style', `animation-delay:${i * 0.12}s`)
-    g.append('rect').attr('x', x - 2).attr('y', y - 18).attr('width', 4).attr('height', 18).attr('fill', '#3a2a1c')
-    g.append('path').attr('d', `M ${x} ${y - 46} L ${x + 16} ${y - 16} L ${x - 16} ${y - 16} Z`).attr('fill', '#2f6a48')
-    g.append('path').attr('d', `M ${x} ${y - 36} L ${x + 12} ${y - 12} L ${x - 12} ${y - 12} Z`).attr('fill', '#3d8658')
+function tree(parent: THREE.Group, x: number, z: number, scale: number) {
+  const group = new THREE.Group()
+  group.position.set(x, h(x, z), z)
+  group.scale.setScalar(scale)
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.35, 7), new THREE.MeshStandardMaterial({ color: DemoHex.soil }))
+  trunk.position.y = 0.67
+  trunk.castShadow = true
+  group.add(trunk)
+  const material = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.33 + Math.random() * 0.035, 0.34, 0.22 + Math.random() * 0.06), roughness: 0.88 })
+  ;[[0.9, 1.15, 1.5], [0.67, 1.86, 1.25], [0.42, 2.43, 0.98]].forEach(([radius, y, height]) => {
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 7), material)
+    crown.position.y = y
+    crown.castShadow = true
+    group.add(crown)
   })
+  parent.add(group)
+}
 
-  // 云
-  const cloudOp = broken.value ? 0.28 : 0.75
-  const cg = svg.append('g').attr('opacity', cloudOp).attr('class', 'ei-bob')
-  cg.append('ellipse').attr('cx', 420).attr('cy', 78).attr('rx', 42).attr('ry', 16).attr('fill', '#c8d6e4')
-  cg.append('ellipse').attr('cx', 448).attr('cy', 74).attr('rx', 24).attr('ry', 14).attr('fill', DemoHex.cloud)
-  if (!broken.value) {
-    for (let i = 0; i < 5; i++) {
-      svg
-        .append('line')
-        .attr('x1', 400 + i * 10)
-        .attr('x2', 397 + i * 10)
-        .attr('y1', 96)
-        .attr('y2', 128)
-        .attr('stroke', DemoHex.rain)
-        .attr('stroke-width', 1.1)
-        .attr('stroke-dasharray', '3 5')
-        .attr('class', 'ei-fall')
-        .attr('style', `animation-delay:${i * 0.1}s`)
-    }
+function rebuildForest() {
+  if (!scene) return
+  if (trees) scene.remove(trees)
+  trees = new THREE.Group()
+  const wanted = Math.round(34 + forest.value * 1.7)
+  let count = 0
+  for (let i = 0; i < 210 && count < wanted; i += 1) {
+    const x = ((i * 37) % 510) / 10 - 25.5
+    const z = ((i * 71) % 550) / 10 - 27.5
+    if (Math.abs(x) < 4.1 || (x > 15 && z < -12)) continue
+    tree(trees, x, z, 0.58 + ((i * 13) % 45) / 100)
+    count += 1
   }
+  scene.add(trees)
+}
 
-  if (broken.value) {
-    // 侵蚀沟
-    svg.append('path').attr('d', 'M 210 328 L 200 360 L 222 360 Z').attr('fill', '#5a3a28').attr('opacity', 0.8)
-    svg.append('path').attr('d', 'M 470 326 L 458 362 L 486 362 Z').attr('fill', '#5a3a28').attr('opacity', 0.8)
-    for (const x of [240, 300, 500, 560]) {
-      svg
-        .append('path')
-        .attr('d', `M ${x} 250 L ${x + 8} 310`)
-        .attr('stroke', DemoHex.warm)
-        .attr('stroke-width', 1.6)
-        .attr('marker-end', 'url(#ei-bad)')
-        .attr('class', 'ei-wilt')
-    }
-    svg.append('text').attr('x', 390).attr('y', 250).attr('text-anchor', 'middle').attr('fill', DemoHex.warm).attr('font-size', 10).text('暴雨冲刷 · 水土流失')
+function river() {
+  const shape = new THREE.Shape()
+  shape.moveTo(-2.2, -31)
+  shape.bezierCurveTo(-1.4, -15, 2.2, -8, 0.4, 2)
+  shape.bezierCurveTo(-2.1, 13, 1.8, 22, -0.8, 31)
+  shape.lineTo(3.8, 31)
+  shape.bezierCurveTo(5.8, 21, 1.8, 12, 4.6, 2)
+  shape.bezierCurveTo(6.8, -8, 3.4, -17, 2.6, -31)
+  shape.closePath()
+  const geometry = new THREE.ShapeGeometry(shape)
+  geometry.rotateX(-Math.PI / 2)
+  water = new THREE.Mesh(geometry, new THREE.MeshPhysicalMaterial({ color: DemoHex.water, roughness: 0.16, metalness: 0.08, transparent: true, opacity: 0.92, clearcoat: 0.65 }))
+  water.position.y = -1.75
+  scene!.add(water)
+}
+
+function rainField() {
+  const count = 2400
+  rainPositions = new Float32Array(count * 3)
+  for (let i = 0; i < count; i += 1) {
+    rainPositions[i * 3] = (Math.random() - 0.5) * 58
+    rainPositions[i * 3 + 1] = Math.random() * 25 + 1
+    rainPositions[i * 3 + 2] = (Math.random() - 0.5) * 58
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3))
+  rainPoints = new THREE.Points(geometry, new THREE.PointsMaterial({ color: DemoHex.rainDrop, size: 0.065, transparent: true, opacity: 0.56, depthWrite: false }))
+  scene!.add(rainPoints)
+}
+
+function cloud(x: number, y: number, z: number) {
+  const group = new THREE.Group()
+  const material = new THREE.MeshStandardMaterial({ color: DemoHex.cloud, roughness: 1, transparent: true, opacity: 0.72 })
+  for (let i = 0; i < 6; i += 1) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.3 + Math.random(), 12, 8), material)
+    mesh.position.set((i - 2.5) * 1.25, Math.random() * 0.8, (Math.random() - 0.5) * 1.2)
+    group.add(mesh)
+  }
+  group.position.set(x, y, z)
+  scene!.add(group)
+}
+
+function update() {
+  if (!rainPoints || !water || !ground) return
+  const material = rainPoints.material as THREE.PointsMaterial
+  material.opacity = 0.12 + rain.value / 100 * 0.7
+  material.size = 0.035 + rain.value / 1800
+  ground.color.setHSL(0.39 - rain.value / 1500, 0.3 + rain.value / 500, 0.16 + rain.value / 1300)
+  water.position.y = -1.86 + riverLevel.value / 200
+  water.scale.x = 1 + riverLevel.value / 260
+  ;(water.material as THREE.MeshPhysicalMaterial).color.set(erosion.value > 70 ? DemoHex.soil : DemoHex.water)
+}
+
+function preset(value: 'intact' | 'broken') {
+  if (value === 'intact') {
+    forest.value = 86
+    rain.value = 64
   } else {
-    svg.append('text').attr('x', 390).attr('y', 250).attr('text-anchor', 'middle').attr('fill', '#7dd3a0').attr('font-size', 10).text('林冠截留 · 枯枝落叶护土')
+    forest.value = 20
+    rain.value = 84
   }
+}
 
-  // 连锁卡片
-  const cards = broken.value
-    ? [
-        { t: '生物', d: '森林锐减' },
-        { t: '气候', d: '变干变热' },
-        { t: '水文', d: '洪枯加剧' },
-        { t: '土壤', d: '肥力下降' },
-        { t: '地貌', d: '沟蚀加重' },
-      ]
-    : [
-        { t: '生物', d: '植被完好' },
-        { t: '气候', d: '湿润稳定' },
-        { t: '水文', d: '径流平稳' },
-        { t: '土壤', d: '有机质高' },
-        { t: '地貌', d: '坡面稳定' },
-      ]
-  cards.forEach((c, i) => {
-    const x = 24 + i * 150
-    svg.append('rect').attr('x', x).attr('y', 382).attr('width', 140).attr('height', 42).attr('rx', 6).attr('fill', DemoHex.panel).attr('stroke', broken.value ? '#3a2430' : DemoHex.inkFaint)
-    svg.append('text').attr('x', x + 12).attr('y', 400).attr('fill', broken.value ? DemoHex.warm : '#7dd3a0').attr('font-size', 10).attr('font-weight', 600).text(c.t)
-    svg.append('text').attr('x', x + 12).attr('y', 416).attr('fill', DemoHex.inkDim).attr('font-size', 10).text(c.d)
-    if (i < cards.length - 1) {
-      svg
-        .append('path')
-        .attr('d', `M ${x + 140} 403 L ${x + 150} 403`)
-        .attr('stroke', broken.value ? DemoHex.warm : '#5cb87a')
-        .attr('stroke-width', 1.4)
-        .attr('marker-end', broken.value ? 'url(#ei-bad)' : 'url(#ei-ok)')
-        .attr('class', 'ei-flow')
+function init() {
+  if (!mount.value) return
+  scene = new THREE.Scene()
+  scene.background = new THREE.Color(DemoHex.canvasFog)
+  scene.fog = new THREE.FogExp2(DemoHex.canvasFog, 0.018)
+  camera = new THREE.PerspectiveCamera(43, 1, 0.1, 180)
+  camera.position.set(30, 21, 38)
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8))
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  mount.value.appendChild(renderer.domElement)
+  controls = new OrbitControls(camera, renderer.domElement)
+  controls.target.set(0, 0, 0)
+  controls.enableDamping = true
+  controls.minDistance = 20
+  controls.maxDistance = 82
+  controls.maxPolarAngle = Math.PI * 0.48
+  scene.add(new THREE.HemisphereLight(DemoHex.lightHemiSky, DemoHex.lightHemiGround, 2.2))
+  const sun = new THREE.DirectionalLight(DemoHex.lightKey, 3.1)
+  sun.position.set(-22, 35, 18)
+  sun.castShadow = true
+  sun.shadow.mapSize.set(1024, 1024)
+  scene.add(sun)
+  terrain()
+  river()
+  rainField()
+  rebuildForest()
+  cloud(-19, 19, -17)
+  cloud(8, 23, -25)
+  cloud(25, 17, -6)
+  const resize = () => {
+    if (!mount.value || !renderer || !camera) return
+    const { clientWidth: width, clientHeight: height } = mount.value
+    renderer.setSize(width, height, false)
+    camera.aspect = width / height
+    camera.updateProjectionMatrix()
+  }
+  resizeObserver = new ResizeObserver(resize)
+  resizeObserver.observe(mount.value)
+  resize()
+  update()
+  const loop = () => {
+    raf = requestAnimationFrame(loop)
+    const delta = Math.min(clock.getDelta(), 0.05)
+    if (playing.value && rainPositions && rainPoints) {
+      const speed = 9 + rain.value * 0.13
+      for (let i = 0; i < rainPositions.length; i += 3) {
+        rainPositions[i + 1] -= speed * delta
+        if (rainPositions[i + 1] < h(rainPositions[i], rainPositions[i + 2]) + 0.2) rainPositions[i + 1] = 26 + Math.random() * 9
+      }
+      rainPoints.geometry.attributes.position.needsUpdate = true
     }
-  })
+    controls?.update()
+    renderer?.render(scene!, camera!)
+  }
+  loop()
 }
 
-function redraw() {
-  if (isChain.value) drawChain()
-  else drawElements()
-}
-
-watch([() => props.stepId, active, broken], () => requestAnimationFrame(redraw))
-onMounted(() => requestAnimationFrame(redraw))
-onUnmounted(() => {
-  if (svgRef.value) d3.select(svgRef.value).selectAll('*').remove()
+watch([rain, forest], () => {
+  update()
+  rebuildForest()
+})
+onMounted(init)
+onBeforeUnmount(() => {
+  cancelAnimationFrame(raf)
+  resizeObserver?.disconnect()
+  controls?.dispose()
+  renderer?.dispose()
+  renderer?.domElement.remove()
 })
 </script>
 
 <template>
-  <div class="wrap">
-    <div v-if="isChain" class="toolbar">
-      <button type="button" class="chip" :class="{ on: !broken }" @click="broken = false">森林完好</button>
-      <button type="button" class="chip" :class="{ on: broken }" @click="broken = true">森林破坏</button>
-      <span class="note">同一坡面，要素连锁变化</span>
-    </div>
-    <div v-else class="toolbar">
-      <button
-        v-for="e in ELEMS"
-        :key="e.id"
-        type="button"
-        class="chip"
-        :class="{ on: active === e.id }"
-        @click="active = e.id"
-      >
-        {{ e.name }}
-      </button>
-    </div>
-    <svg ref="svgRef" class="canvas" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet" />
+  <div class="sim" :class="{ elements: isElements }">
+    <div ref="mount" class="world" aria-label="雨季森林山谷三维互动场景" />
+    <div class="vignette" />
+
+    <section v-if="isElements" class="elements-board" aria-label="自然环境要素联系示意图">
+      <header><p>自然环境系统</p><h2>要素不是孤立存在，而是组成有机整体</h2></header>
+      <div class="system-map">
+        <svg viewBox="0 0 720 330" aria-hidden="true">
+          <defs><marker id="element-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+          <path d="M360 72 C270 78 230 118 194 150" /><path d="M360 72 C450 78 490 118 526 150" /><path d="M194 150 C228 226 284 260 360 266" /><path d="M526 150 C492 226 436 260 360 266" /><path d="M194 150 C290 132 430 132 526 150" />
+        </svg>
+        <article v-for="(item, index) in elements" :key="item.id" class="element-card" :class="`pos-${index}`" :style="{ '--element-color': item.color }"><i /><b>{{ item.name }}</b><small>{{ item.copy }}</small></article>
+        <div class="system-core"><b>自然环境整体</b><span>结构 · 功能 · 演化</span></div>
+      </div>
+      <footer><span><i class="matter" />物质迁移：水、气体、养分、沉积物</span><span><i class="energy" />能量交换：太阳辐射、热量与势能</span><strong>相互联系 · 统一演化 · 区域间传导</strong></footer>
+    </section>
+
+    <template v-else>
+      <header class="hud top"><div><p>雨季 · 山地森林流域</p><h2>自然环境整体响应实验场</h2></div><div class="live"><i />实时模拟 <button @click="playing = !playing">{{ playing ? '暂停雨幕' : '继续降雨' }}</button></div></header>
+      <aside class="hud control"><strong>干预条件</strong><label>降雨强度 <b>{{ rain }} mm/h</b></label><input v-model.number="rain" type="range" min="10" max="100"><label>森林覆盖 <b>{{ forest }}%</b></label><input v-model.number="forest" type="range" min="5" max="95"><div><button @click="preset('intact')">森林完整</button><button class="danger" @click="preset('broken')">模拟砍伐</button></div><small>拖拽旋转 · 滚轮缩放</small></aside>
+      <aside class="hud analysis"><div class="state"><span>当前状态</span><b>{{ stateName }}</b></div><p>{{ stateCopy }}</p><div v-for="metric in [{ n: '河流水位', v: riverLevel, u: '%', c: '' }, { n: '地表径流', v: runoff, u: 'm³/s', c: 'blue' }, { n: '侵蚀风险', v: erosion, u: '/100', c: 'soil' }]" :key="metric.n" class="metric"><span>{{ metric.n }}</span><b>{{ metric.v }}<small>{{ metric.u }}</small></b><i><em :class="metric.c" :style="{ width: Math.min(100, metric.v) + '%' }" /></i></div></aside>
+      <footer class="hud chain"><div><b>植被减少</b><small>{{ forest }}% 覆盖</small></div><i>→</i><div><b>截留下渗减弱</b><small>径流 {{ runoff }} m³/s</small></div><i>→</i><div><b>土壤侵蚀增强</b><small>风险 {{ erosion }}</small></div><i>→</i><div><b>河流响应</b><small>水位 {{ riverLevel }}%</small></div><p>人类改变植被，会通过水、土壤、生物和大气反馈影响整个流域。</p></footer>
+      <div class="disclaimer">课堂模拟 · 数值仅表示相对变化，不作水文预报依据</div>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.wrap {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background: var(--bg-canvas);
-}
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
-}
-.chip {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-500);
-  border-radius: 999px;
-  padding: 5px 12px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.chip.on {
-  border-color: var(--primary);
-  color: var(--primary-mid);
-  background: var(--primary-light);
-  font-weight: 600;
-}
-.note {
-  font-size: 11px;
-  color: var(--text-400);
-  margin-left: 6px;
-}
-.canvas {
-  flex: 1;
-  width: 100%;
-  min-height: 320px;
-}
+.sim{position:relative;height:100%;min-height:520px;overflow:hidden;background:var(--demo-canvas);color:var(--demo-ink);font-family:ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif}.world,.world :deep(canvas){position:absolute;inset:0;width:100%;height:100%;display:block}.vignette{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgb(7 11 22 / 38%),transparent 30%,transparent 62%,rgb(7 11 22 / 58%))}.hud{position:absolute;z-index:2;backdrop-filter:blur(12px);background:color-mix(in srgb,var(--demo-panel) 78%,transparent);border:1px solid color-mix(in srgb,var(--demo-ink-muted) 22%,transparent);box-shadow:0 12px 32px rgb(0 0 0 / 24%)}.top{top:20px;left:22px;right:22px;padding:13px 17px;display:flex;justify-content:space-between;align-items:center;border-radius:13px}.top p{margin:0 0 3px;color:var(--demo-vegetation);letter-spacing:.12em;font-size:10px;font-weight:700}.top h2{margin:0;font-size:18px;letter-spacing:.04em}.live{display:flex;gap:8px;align-items:center;color:var(--demo-ink-muted);font-size:12px}.live i{width:7px;height:7px;border-radius:50%;background:var(--demo-vegetation);box-shadow:0 0 9px var(--demo-vegetation)}.hud button{border:1px solid color-mix(in srgb,var(--demo-ink-muted) 35%,transparent);background:color-mix(in srgb,var(--demo-panel) 45%,transparent);border-radius:7px;color:var(--demo-ink);padding:6px 9px;cursor:pointer;font:inherit}.hud button:hover{background:var(--demo-vegetation);color:var(--demo-canvas);border-color:var(--demo-vegetation)}.control{top:105px;left:22px;width:208px;padding:15px;border-radius:12px}.control>strong{display:block;margin-bottom:13px;text-transform:uppercase;letter-spacing:.13em;font-size:10px;color:var(--demo-ink-muted)}.control label{display:flex;justify-content:space-between;margin:12px 0 5px;font-size:12px;color:var(--demo-ink-muted)}.control label b{color:var(--demo-vegetation);font-variant-numeric:tabular-nums}.control input{width:100%;accent-color:var(--demo-vegetation)}.control>div{display:flex;gap:7px;margin-top:14px}.control>div button{font-size:11px;flex:1;padding:7px 4px}.control .danger{color:var(--demo-warm);border-color:color-mix(in srgb,var(--demo-warm) 48%,transparent)}.control small{display:block;margin-top:13px;font-size:10px;color:var(--demo-ink-dim)}.analysis{right:22px;top:105px;width:224px;padding:14px 15px;border-radius:12px}.state{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--demo-ink-dim)}.state b{color:var(--demo-vegetation);font-size:13px}.analysis>p{font-size:11px;line-height:1.55;color:var(--demo-ink-muted);margin:10px 0 15px}.metric{display:grid;grid-template-columns:1fr auto;gap:4px;margin-top:10px;font-size:10px;color:var(--demo-ink-dim)}.metric>b{color:var(--demo-ink);font-size:13px;font-variant-numeric:tabular-nums}.metric small{font-size:8px;color:var(--demo-ink-dim);margin-left:2px}.metric i{height:4px;background:color-mix(in srgb,var(--demo-ink) 17%,transparent);grid-column:1/3;border-radius:4px;overflow:hidden}.metric em{display:block;height:100%;border-radius:4px;background:var(--demo-vegetation)}.metric em.blue{background:var(--demo-water)}.metric em.soil{background:var(--demo-soil)}.chain{left:22px;right:22px;bottom:27px;border-radius:12px;padding:10px;display:flex;align-items:center;gap:8px}.chain>div{min-width:92px;display:grid;padding:7px 9px;border:1px solid color-mix(in srgb,var(--demo-ink-muted) 22%,transparent);border-radius:7px;background:color-mix(in srgb,var(--demo-panel) 42%,transparent)}.chain b{font-size:11px}.chain small{font-size:9px;color:var(--demo-ink-muted);margin-top:2px}.chain>i{font-size:18px;color:var(--demo-lift);font-style:normal}.chain p{margin:0 0 0 5px;font-size:10px;line-height:1.45;color:var(--demo-ink-muted);max-width:220px}.disclaimer{position:absolute;right:24px;bottom:8px;z-index:3;color:var(--demo-ink-dim);font-size:9px}.elements .world{filter:blur(2px) brightness(.32)}.elements-board{position:absolute;z-index:3;inset:18px;display:grid;grid-template-rows:auto 1fr auto;padding:18px 22px;border:1px solid color-mix(in srgb,var(--demo-ink-muted) 24%,transparent);border-radius:16px;background:color-mix(in srgb,var(--demo-canvas) 82%,transparent);backdrop-filter:blur(10px)}.elements-board header p{margin:0 0 4px;color:var(--demo-accent-soft);font-size:10px;letter-spacing:.14em}.elements-board header h2{margin:0;font-size:17px}.system-map{position:relative;width:min(720px,100%);height:330px;margin:auto}.system-map>svg{position:absolute;inset:0;width:100%;height:100%}.system-map>svg>path{fill:none;stroke:var(--demo-accent);stroke-width:2;stroke-dasharray:7 10;marker-start:url(#element-arrow);marker-end:url(#element-arrow);animation:flow 3.5s linear infinite}.system-map marker path{fill:var(--demo-accent)}.element-card{--element-color:var(--demo-accent);position:absolute;width:158px;display:grid;grid-template-columns:10px 1fr;gap:3px 8px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--element-color) 65%,transparent);border-radius:10px;background:color-mix(in srgb,var(--demo-panel) 88%,transparent);box-shadow:0 8px 20px rgb(0 0 0 / 22%)}.element-card i{grid-row:1/3;width:8px;height:8px;margin-top:4px;border-radius:50%;background:var(--element-color);box-shadow:0 0 10px var(--element-color)}.element-card b{font-size:12px}.element-card small{color:var(--demo-ink-dim);font-size:9px;line-height:1.35}.pos-0{top:8px;left:calc(50% - 79px)}.pos-1{top:116px;right:14px}.pos-2{bottom:2px;right:calc(50% - 79px)}.pos-3{top:116px;left:14px}.pos-4{top:110px;left:calc(50% - 79px)}.system-core{position:absolute;top:215px;left:calc(50% - 92px);width:184px;text-align:center;display:grid;gap:2px}.system-core b{color:var(--demo-lift);font-size:12px}.system-core span{color:var(--demo-ink-dim);font-size:9px}.elements-board footer{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;color:var(--demo-ink-muted);font-size:10px}.elements-board footer span{display:flex;align-items:center;gap:6px}.elements-board footer i{width:18px;height:3px;border-radius:3px}.elements-board footer .matter{background:var(--demo-water)}.elements-board footer .energy{background:var(--demo-lift)}.elements-board footer strong{color:var(--demo-ink);font-size:10px}@keyframes flow{to{stroke-dashoffset:-34}}@media(max-width:700px){.sim{min-height:620px}.analysis{top:auto;bottom:116px;right:12px;width:190px}.control{left:12px;top:96px;width:180px}.top{left:12px;right:12px;top:12px}.top h2{font-size:14px}.live{font-size:0}.live button{font-size:11px}.chain{left:12px;right:12px;bottom:22px;overflow:auto}.chain p,.chain>i{display:none}.chain>div{min-width:88px}.elements-board{inset:10px;padding:14px}.system-map{transform:scale(.84)}.elements-board footer{gap:8px}}
 </style>

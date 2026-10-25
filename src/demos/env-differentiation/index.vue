@@ -3,8 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as d3 from 'd3'
 import type { DemoEntry } from '@/curriculum/demoRegistry'
 import { DemoHex } from '@/demos/theme'
-import CesiumTerrain from './CesiumTerrain.vue'
 import CinematicTerrain from './CinematicTerrain.vue'
+import LocalTerrain from './LocalTerrain.vue'
 
 const props = defineProps<{
   stepId: string
@@ -15,40 +15,28 @@ const svgRef = ref<SVGSVGElement | null>(null)
 const W = 780
 const H = 440
 
-/** 纬度地带：从赤道到极地（北半球示意）+ 大致纬度范围 */
+/** 纬度地带：北半球理想化样带，仅用于说明热量梯度，不代表任一条经线的完整实况。 */
 const LAT_BELTS = [
-  { name: '热带雨林', climate: '全年高温多雨', color: '#1f8a4a', trees: 'dense' as const, lat0: 0, lat1: 10, tip: '赤道低压控制 · 对流雨', location: '菲律宾巴拉望', image: '/images/biomes/tropical-rainforest.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Palawan,_Philippines,_Tropical_rainforest.jpg', credit: 'Vyacheslav Argenberg · CC BY 4.0', plantName: '垂花赫蕉', plantImage: '/images/biomes/plants/plant-heliconia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Heliconia_rostrata_close_up.jpg', plantCredit: 'Rudra P. Dhua · CC BY-SA 4.0' },
-  { name: '热带草原', climate: '干湿季分明', color: '#7aab3a', trees: 'savanna' as const, lat0: 10, lat1: 20, tip: '赤道低压与信风交替', location: '南非萨比沙', image: '/images/biomes/tropical-savanna.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Savanna_landscape_at_Sabi_Sand.jpg', credit: 'Cosal · CC BY-SA 4.0', plantName: '伞形金合欢', plantImage: '/images/biomes/plants/plant-acacia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Vachellia_tortilis_kz04.jpg', plantCredit: 'Krzysztof Ziarnek · Wikimedia Commons' },
-  { name: '亚热带常绿', climate: '冬温夏热', color: '#3d9a55', trees: 'mixed' as const, lat0: 20, lat1: 35, tip: '副高与季风影响', location: '日本冲绳山原', image: '/images/biomes/subtropical-evergreen.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Subtropical_Forest_of_Yanbaru_National_Park_Okinawa_2018.jpg', credit: 'kohei sasabuchi · CC BY 2.0', plantName: '山茶', plantImage: '/images/biomes/plants/plant-camellia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Camellia-japonica.jpg', plantCredit: 'Nagahitoyuki · Wikimedia Commons' },
-  { name: '温带落叶阔叶', climate: '四季分明', color: '#5a9a3a', trees: 'broad' as const, lat0: 35, lat1: 50, tip: '西风带 / 季风温带', location: '美国北卡罗来纳', image: '/images/biomes/temperate-deciduous.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Central_North_Carolina_forest.jpg', credit: 'Sfoske70 · CC BY-SA 4.0', plantName: '欧洲栎', plantImage: '/images/biomes/plants/plant-oak.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Quercus_robur_acorns_and_leaves.jpg', plantCredit: 'Mannivu · Wikimedia Commons' },
-  { name: '亚寒带针叶', climate: '冬长严寒', color: '#2d6a45', trees: 'conifer' as const, lat0: 50, lat1: 65, tip: '大陆性冷湿', location: '加拿大魁北克', image: '/images/biomes/boreal-taiga.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Taiga_Landscape_in_Canada.jpg', credit: 'peupleloup · CC BY-SA 2.0', plantName: '黑云杉', plantImage: '/images/biomes/plants/plant-black-spruce.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Picea_mariana_cone.JPG', plantCredit: 'Tilo Podner · CC BY-SA 3.0' },
-  { name: '苔原', climate: '寒、短促暖季', color: '#7a9a8a', trees: 'tundra' as const, lat0: 65, lat1: 75, tip: '极地气团边缘', location: '加拿大伊瓦维克', image: '/images/biomes/tundra.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tundra_landscape_looking_south_toward_British_Mountains_near_Engigstciak,_Ivvavik_National_Park,_YT.jpg', credit: 'Daniel Case · CC BY-SA 3.0', plantName: '北极柳', plantImage: '/images/biomes/plants/plant-arctic-willow.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Salix_arctica_-_Arctic_willow.jpg', plantCredit: 'Wikimedia Commons · CC BY-SA 2.0' },
-  { name: '冰原', climate: '终年严寒', color: '#d0dce8', trees: 'ice' as const, lat0: 75, lat1: 90, tip: '极地高压 · 冰雪覆盖', location: '极地冰原景观', image: '/images/biomes/polar-ice.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Ice_landscape.jpg', credit: 'Gürkan Sengün · Public Domain', plantName: '南极发草', plantImage: '/images/biomes/plants/plant-antarctic-hair-grass.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:D._antarctica.jpg', plantCredit: 'Claurabert · Wikimedia Commons' },
+  { name: '热带雨林带', climate: '全年高温多雨', color: DemoHex.biomeForest, trees: 'dense' as const, lat0: 0, lat1: 10, tip: '赤道低压控制 · 对流雨', location: '菲律宾巴拉望', image: '/images/biomes/tropical-rainforest.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Palawan,_Philippines,_Tropical_rainforest.jpg', credit: 'Vyacheslav Argenberg · CC BY 4.0', plantName: '垂花赫蕉', plantImage: '/images/biomes/plants/plant-heliconia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Heliconia_rostrata_close_up.jpg', plantCredit: 'Rudra P. Dhua · CC BY-SA 4.0' },
+  { name: '热带草原带', climate: '干湿季分明', color: DemoHex.biomeGrass, trees: 'savanna' as const, lat0: 10, lat1: 20, tip: '赤道低压与信风交替', location: '南非萨比沙', image: '/images/biomes/tropical-savanna.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Savanna_landscape_at_Sabi_Sand.jpg', credit: 'Cosal · CC BY-SA 4.0', plantName: '伞形金合欢', plantImage: '/images/biomes/plants/plant-acacia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Vachellia_tortilis_kz04.jpg', plantCredit: 'Krzysztof Ziarnek · Wikimedia Commons' },
+  { name: '亚热带常绿阔叶林带', climate: '冬温夏热', color: DemoHex.vegetation, trees: 'mixed' as const, lat0: 20, lat1: 35, tip: '季风与海陆位置共同影响', location: '日本冲绳山原', image: '/images/biomes/subtropical-evergreen.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Subtropical_Forest_of_Yanbaru_National_Park_Okinawa_2018.jpg', credit: 'kohei sasabuchi · CC BY 2.0', plantName: '山茶', plantImage: '/images/biomes/plants/plant-camellia.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Camellia-japonica.jpg', plantCredit: 'Nagahitoyuki · Wikimedia Commons' },
+  { name: '温带落叶阔叶林带', climate: '四季分明', color: DemoHex.biomeGrass, trees: 'broad' as const, lat0: 35, lat1: 50, tip: '西风或温带季风影响', location: '美国北卡罗来纳', image: '/images/biomes/temperate-deciduous.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Central_North_Carolina_forest.jpg', credit: 'Sfoske70 · CC BY-SA 4.0', plantName: '欧洲栎', plantImage: '/images/biomes/plants/plant-oak.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Quercus_robur_acorns_and_leaves.jpg', plantCredit: 'Mannivu · Wikimedia Commons' },
+  { name: '亚寒带针叶林带', climate: '冬长严寒', color: DemoHex.biomeForest, trees: 'conifer' as const, lat0: 50, lat1: 65, tip: '热量减少 · 冷湿环境', location: '加拿大魁北克', image: '/images/biomes/boreal-taiga.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Taiga_Landscape_in_Canada.jpg', credit: 'peupleloup · CC BY-SA 2.0', plantName: '黑云杉', plantImage: '/images/biomes/plants/plant-black-spruce.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Picea_mariana_cone.JPG', plantCredit: 'Tilo Podner · CC BY-SA 3.0' },
+  { name: '苔原带', climate: '寒冷、暖季短促', color: DemoHex.biomeTundra, trees: 'tundra' as const, lat0: 65, lat1: 75, tip: '热量不足 · 永久冻土广布', location: '加拿大伊瓦维克', image: '/images/biomes/tundra.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Tundra_landscape_looking_south_toward_British_Mountains_near_Engigstciak,_Ivvavik_National_Park,_YT.jpg', credit: 'Daniel Case · CC BY-SA 3.0', plantName: '北极柳', plantImage: '/images/biomes/plants/plant-arctic-willow.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Salix_arctica_-_Arctic_willow.jpg', plantCredit: 'Wikimedia Commons · CC BY-SA 2.0' },
+  { name: '冰原带', climate: '终年严寒，高等植物极少', color: DemoHex.biomeIce, trees: 'ice' as const, lat0: 75, lat1: 90, tip: '极地高压 · 冰雪覆盖', location: '极地冰原景观', image: '/images/biomes/polar-ice.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Ice_landscape.jpg', credit: 'Gürkan Sengün · Public Domain', plantName: '冰原（高等植物极少）', plantImage: '/images/biomes/polar-ice.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Ice_landscape.jpg', plantCredit: 'Gürkan Sengün · Public Domain' },
 ]
 
 const LON_BELTS = [
-  { name: '森林', note: '降水较多', color: '#2f7a50', tip: '距海近 · 水汽充足', location: '美国北卡罗来纳', image: '/images/biomes/temperate-deciduous.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Central_North_Carolina_forest.jpg', credit: 'Sfoske70 · CC BY-SA 4.0', plantName: '欧洲栎', plantImage: '/images/biomes/plants/plant-oak.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Quercus_robur_acorns_and_leaves.jpg', plantCredit: 'Mannivu · Wikimedia Commons' },
-  { name: '森林草原', note: '半湿润过渡', color: '#5a9a3a', tip: '林地与草地镶嵌分布', location: '俄罗斯阿尔泰边疆区', image: '/images/biomes/forest-steppe.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Forest_patches_in_steppe.jpg', credit: 'Kraulinn · CC BY-SA 3.0', plantName: '欧洲白桦', plantImage: '/images/biomes/plants/plant-birch.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Betula_pendula_leaves.jpg', plantCredit: 'Nefronus · CC0' },
-  { name: '草原', note: '半干旱', color: '#aaba3a', tip: '降水减少 · 草本为主', location: '俄罗斯顿河流域', image: '/images/biomes/temperate-grassland.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Steppe,_Grassland_plain,_Rostov-on-Don,_Russia.jpg', credit: 'Vyacheslav Argenberg · CC BY 4.0', plantName: '针茅', plantImage: '/images/biomes/plants/plant-feather-grass.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Stipa_capillata_kz07.jpg', plantCredit: 'Krzysztof Ziarnek · Wikimedia Commons' },
-  { name: '荒漠', note: '干旱', color: '#c4a06a', tip: '深内陆 · 蒸发远大于降水', location: '阿联酋沙迦沙漠', image: '/images/biomes/desert-dunes.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Desert_Dunes.jpg', credit: 'JSPhotography2016 · CC BY-SA 4.0', plantName: '梭梭', plantImage: '/images/biomes/plants/plant-saxaul.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Plante_Haloxylon_ammodendron.jpg', plantCredit: 'Zee AM · CC BY-SA 4.0' },
-]
-
-const VERT_BELTS = [
-  { name: '基带阔叶林', color: '#3d9a55', h: 0.18, tip: '与当地水平地带一致' },
-  { name: '针阔混交', color: '#2f7a48', h: 0.16, tip: '过渡带' },
-  { name: '针叶林', color: '#1f5a38', h: 0.18, tip: '类似亚寒带针叶林' },
-  { name: '高山草甸', color: '#6aaa5a', h: 0.14, tip: '类似温带草原气候带' },
-  { name: '高山苔原', color: '#8aa898', h: 0.14, tip: '类似苔原带' },
-  { name: '冰雪带', color: '#e8eef4', h: 0.2, tip: '类似冰原带 · 终年积雪' },
+  { name: '森林带', note: '降水较多', color: DemoHex.biomeForest, tip: '距海近 · 水汽充足', location: '美国北卡罗来纳', image: '/images/biomes/temperate-deciduous.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Central_North_Carolina_forest.jpg', credit: 'Sfoske70 · CC BY-SA 4.0', plantName: '欧洲栎', plantImage: '/images/biomes/plants/plant-oak.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Quercus_robur_acorns_and_leaves.jpg', plantCredit: 'Mannivu · Wikimedia Commons' },
+  { name: '森林草原带', note: '半湿润过渡', color: DemoHex.vegetation, tip: '林地与草地镶嵌分布', location: '俄罗斯阿尔泰边疆区', image: '/images/biomes/forest-steppe.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Forest_patches_in_steppe.jpg', credit: 'Kraulinn · CC BY-SA 3.0', plantName: '欧洲白桦', plantImage: '/images/biomes/plants/plant-birch.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Betula_pendula_leaves.jpg', plantCredit: 'Nefronus · CC0' },
+  { name: '草原带', note: '半干旱', color: DemoHex.biomeGrass, tip: '降水减少 · 草本为主', location: '俄罗斯顿河流域', image: '/images/biomes/temperate-grassland.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Steppe,_Grassland_plain,_Rostov-on-Don,_Russia.jpg', credit: 'Vyacheslav Argenberg · CC BY 4.0', plantName: '针茅', plantImage: '/images/biomes/plants/plant-feather-grass.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Stipa_capillata_kz07.jpg', plantCredit: 'Krzysztof Ziarnek · Wikimedia Commons' },
+  { name: '荒漠带', note: '干旱', color: DemoHex.biomeDesert, tip: '深内陆 · 蒸发远大于降水', location: '阿联酋沙迦沙漠', image: '/images/biomes/desert-dunes.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Desert_Dunes.jpg', credit: 'JSPhotography2016 · CC BY-SA 4.0', plantName: '梭梭', plantImage: '/images/biomes/plants/plant-saxaul.jpg', plantSourceUrl: 'https://commons.wikimedia.org/wiki/File:Plante_Haloxylon_ammodendron.jpg', plantCredit: 'Zee AM · CC BY-SA 4.0' },
 ]
 
 const latHi = ref(0)
 const lonHi = ref(0)
-const vertHi = ref(0)
 const hoverLat = ref<number | null>(null)
 const hoverLon = ref<number | null>(null)
-const hoverVert = ref<number | null>(null)
-const verticalView = ref<'cinematic' | 'terrain'>('cinematic')
 type LandscapePreview = {
   name: string
   detail: string
@@ -92,6 +80,7 @@ function handleKeydown(event: KeyboardEvent) {
 const mode = computed(() => {
   if (props.stepId === 'longitudinal') return 'longitudinal'
   if (props.stepId === 'vertical') return 'vertical'
+  if (props.stepId === 'local') return 'local'
   return 'latitudinal'
 })
 
@@ -104,8 +93,10 @@ const hint = computed(() => {
     const b = LON_BELTS[lonHi.value]!
     return `${b.name} · ${b.tip}`
   }
-  const b = VERT_BELTS[vertHi.value]!
-  return `${b.name} · ${b.tip} · 垂直带≈纬度带压缩版`
+  if (mode.value === 'vertical') {
+    return '山麓基带受当地水平自然带制约，带谱随海拔、水热和坡向变化'
+  }
+  return '同一气候背景下，局地地形、坡向、水分和地面物质造成小尺度镶嵌差异'
 })
 
 let disposed = false
@@ -221,7 +212,7 @@ function drawEarthDisc(
     .attr('width', r * 2.3)
     .attr('height', r * 2.3)
     .attr('preserveAspectRatio', 'xMidYMid slice')
-  g.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r).attr('fill', '#041018').attr('opacity', 0.22)
+  g.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r).attr('fill', DemoHex.canvas).attr('opacity', 0.22)
   svg
     .append('circle')
     .attr('cx', cx)
@@ -268,11 +259,11 @@ function drawLat() {
   marker(defs, 'ed-heat', DemoHex.warm)
 
   const sky = defs.append('linearGradient').attr('id', 'ed-sky').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
-  sky.append('stop').attr('offset', '0%').attr('stop-color', '#152838')
+  sky.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.panelSoft)
   sky.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.canvas)
   svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ed-sky)').attr('rx', 12)
 
-  svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('从赤道到两极的地域分异')
+  svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('纬度地带性分异（北半球理想化样带）')
   const latFactor = svg.append('text').attr('x', 24).attr('y', 42).attr('font-size', 10)
   latFactor.append('tspan').attr('fill', DemoHex.inkDim).text('主导因素：')
   latFactor.append('tspan').attr('fill', 'var(--knowledge-warm)').attr('font-weight', 700).text('热量')
@@ -349,9 +340,9 @@ function drawLat() {
   const gap = 5
 
   const photoShade = defs.append('linearGradient').attr('id', 'ed-photo-shade').attr('x1', '0').attr('y1', '0').attr('x2', '1').attr('y2', '0')
-  photoShade.append('stop').attr('offset', '0%').attr('stop-color', '#07121c').attr('stop-opacity', 0.96)
-  photoShade.append('stop').attr('offset', '58%').attr('stop-color', '#07121c').attr('stop-opacity', 0.72)
-  photoShade.append('stop').attr('offset', '100%').attr('stop-color', '#07121c').attr('stop-opacity', 0.12)
+  photoShade.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.canvas).attr('stop-opacity', 0.96)
+  photoShade.append('stop').attr('offset', '58%').attr('stop-color', DemoHex.canvas).attr('stop-opacity', 0.72)
+  photoShade.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.canvas).attr('stop-opacity', 0.12)
 
   const nLat = LAT_BELTS.length
   LAT_BELTS.forEach((b, i) => {
@@ -414,7 +405,7 @@ function drawLat() {
     g.append('text')
       .attr('x', x0 + 14)
       .attr('y', y + 18)
-      .attr('fill', '#fff')
+      .attr('fill', DemoHex.ink)
       .attr('font-size', 12)
       .attr('font-weight', 600)
       .attr('style', 'pointer-events:none')
@@ -422,7 +413,7 @@ function drawLat() {
     g.append('text')
       .attr('x', x0 + 14)
       .attr('y', y + 34)
-      .attr('fill', '#dce8ef')
+      .attr('fill', DemoHex.inkMuted)
       .attr('font-size', 10)
       .attr('style', 'pointer-events:none')
       .text(`${b.climate} · ${b.lat0}°–${b.lat1}°N`)
@@ -440,8 +431,8 @@ function drawLat() {
         openBiome(i)
       })
     preview.append('circle').attr('r', 11).attr('fill', 'rgba(4, 15, 24, 0.76)').attr('stroke', 'rgba(255, 255, 255, 0.72)').attr('stroke-width', 1)
-    preview.append('circle').attr('cx', -1.5).attr('cy', -1.5).attr('r', 3.5).attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 1.4)
-    preview.append('line').attr('x1', 1.2).attr('y1', 1.2).attr('x2', 5.5).attr('y2', 5.5).attr('stroke', '#fff').attr('stroke-width', 1.6).attr('stroke-linecap', 'round')
+    preview.append('circle').attr('cx', -1.5).attr('cy', -1.5).attr('r', 3.5).attr('fill', 'none').attr('stroke', DemoHex.ink).attr('stroke-width', 1.4)
+    preview.append('line').attr('x1', 1.2).attr('y1', 1.2).attr('x2', 5.5).attr('y2', 5.5).attr('stroke', DemoHex.ink).attr('stroke-width', 1.6).attr('stroke-linecap', 'round')
     preview.append('title').text(`预览${b.name}实景大图`)
 
     // 连线到地球
@@ -466,7 +457,7 @@ function drawLat() {
   const heatX = 652
   const heatGrad = defs.append('linearGradient').attr('id', 'ed-heat-bar').attr('x1', '0').attr('y1', '1').attr('x2', '0').attr('y2', '0')
   heatGrad.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.warm)
-  heatGrad.append('stop').attr('offset', '100%').attr('stop-color', '#8ec8e8')
+  heatGrad.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.coldSoft)
   svg
     .append('path')
     .attr(
@@ -508,11 +499,11 @@ function drawLon() {
   marker(defs, 'ed-rain', DemoHex.cold)
 
   const sky = defs.append('linearGradient').attr('id', 'ed-lsky').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1')
-  sky.append('stop').attr('offset', '0%').attr('stop-color', '#152838')
+  sky.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.panelSoft)
   sky.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.canvas)
   svg.append('rect').attr('width', W).attr('height', H).attr('fill', 'url(#ed-lsky)').attr('rx', 12)
 
-  svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('从沿海到内陆的地域分异')
+  svg.append('text').attr('x', 24).attr('y', 26).attr('fill', DemoHex.inkMuted).attr('font-size', 12).attr('font-weight', 600).text('干湿度地带性分异（又称经度地带性）')
   const lonFactor = svg.append('text').attr('x', 24).attr('y', 42).attr('font-size', 10)
   lonFactor.append('tspan').attr('fill', DemoHex.inkDim).text('主导因素：')
   lonFactor.append('tspan').attr('fill', 'var(--knowledge-active)').attr('font-weight', 700).text('水分')
@@ -629,9 +620,9 @@ function drawLon() {
   const gap = 10
 
   const lonPhotoShade = defs.append('linearGradient').attr('id', 'ed-lon-photo-shade').attr('x1', '0').attr('y1', '0').attr('x2', '1').attr('y2', '0')
-  lonPhotoShade.append('stop').attr('offset', '0%').attr('stop-color', '#07121c').attr('stop-opacity', 0.96)
-  lonPhotoShade.append('stop').attr('offset', '58%').attr('stop-color', '#07121c').attr('stop-opacity', 0.72)
-  lonPhotoShade.append('stop').attr('offset', '100%').attr('stop-color', '#07121c').attr('stop-opacity', 0.12)
+  lonPhotoShade.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.canvas).attr('stop-opacity', 0.96)
+  lonPhotoShade.append('stop').attr('offset', '58%').attr('stop-color', DemoHex.canvas).attr('stop-opacity', 0.72)
+  lonPhotoShade.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.canvas).attr('stop-opacity', 0.12)
 
   LON_BELTS.forEach((b, i) => {
     // 沿海在下、内陆在上，与右侧降水递减箭头保持同一阅读方向。
@@ -701,7 +692,7 @@ function drawLon() {
     g.append('text')
       .attr('x', x0 + 14)
       .attr('y', y + 40)
-      .attr('fill', '#e0f0e8')
+      .attr('fill', DemoHex.inkMuted)
       .attr('font-size', 10)
       .attr('style', 'pointer-events:none')
       .text(`${b.note} · ${b.tip}`)
@@ -719,8 +710,8 @@ function drawLon() {
         openLonBiome(i)
       })
     preview.append('circle').attr('r', 11).attr('fill', 'rgba(4, 15, 24, 0.76)').attr('stroke', 'rgba(255, 255, 255, 0.72)').attr('stroke-width', 1)
-    preview.append('circle').attr('cx', -1.5).attr('cy', -1.5).attr('r', 3.5).attr('fill', 'none').attr('stroke', '#fff').attr('stroke-width', 1.4)
-    preview.append('line').attr('x1', 1.2).attr('y1', 1.2).attr('x2', 5.5).attr('y2', 5.5).attr('stroke', '#fff').attr('stroke-width', 1.6).attr('stroke-linecap', 'round')
+    preview.append('circle').attr('cx', -1.5).attr('cy', -1.5).attr('r', 3.5).attr('fill', 'none').attr('stroke', DemoHex.ink).attr('stroke-width', 1.4)
+    preview.append('line').attr('x1', 1.2).attr('y1', 1.2).attr('x2', 5.5).attr('y2', 5.5).attr('stroke', DemoHex.ink).attr('stroke-width', 1.6).attr('stroke-linecap', 'round')
     preview.append('title').text(`预览${b.name}实景大图`)
 
     if (on) {
@@ -744,7 +735,7 @@ function drawLon() {
   const moistX = 652
   const moistGrad = defs.append('linearGradient').attr('id', 'ed-moist-bar').attr('x1', '0').attr('y1', '1').attr('x2', '0').attr('y2', '0')
   moistGrad.append('stop').attr('offset', '0%').attr('stop-color', DemoHex.cold)
-  moistGrad.append('stop').attr('offset', '100%').attr('stop-color', '#c4a06a')
+  moistGrad.append('stop').attr('offset', '100%').attr('stop-color', DemoHex.biomeDesert)
   svg
     .append('path')
     .attr(
@@ -753,7 +744,7 @@ function drawLon() {
     )
     .attr('fill', 'url(#ed-moist-bar)')
     .attr('opacity', 0.9)
-  svg.append('text').attr('x', moistX + 12).attr('y', y0 + 18).attr('fill', '#c4a06a').attr('font-size', 10).text('内陆')
+  svg.append('text').attr('x', moistX + 12).attr('y', y0 + 18).attr('fill', DemoHex.biomeDesert).attr('font-size', 10).text('内陆')
   svg
     .append('text')
     .attr('x', moistX + 12)
@@ -772,49 +763,13 @@ function drawLon() {
     .attr('y', 412)
     .attr('fill', DemoHex.inkMuted)
     .attr('font-size', 11)
-    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  沿经线方向更替、大致与海岸平行`)
+    .text(`当前：${cur.name}  ·  ${cur.tip}  ·  大体沿经线延伸、由沿海向内陆更替`)
 }
 
-
-function drawTreeGlyph(
-  g: d3.Selection<SVGGElement, unknown, null, undefined>,
-  x: number,
-  y: number,
-  kind: (typeof LAT_BELTS)[number]['trees'],
-  dark = false,
-) {
-  const fill = dark ? '#3a4a58' : '#0e2818'
-  if (kind === 'ice') {
-    g.append('path').attr('d', `M ${x} ${y} L ${x + 18} ${y - 16} L ${x + 36} ${y} Z`).attr('fill', DemoHex.ink).attr('opacity', 0.7)
-    return
-  }
-  if (kind === 'tundra') {
-    g.append('rect').attr('x', x).attr('y', y - 8).attr('width', 40).attr('height', 6).attr('rx', 2).attr('fill', '#4a6a5a')
-    return
-  }
-  if (kind === 'conifer' || kind === 'dense') {
-    const n = kind === 'dense' ? 4 : 3
-    for (let i = 0; i < n; i++) {
-      const tx = x + i * 12
-      g.append('path').attr('d', `M ${tx} ${y} L ${tx + 6} ${y - 22} L ${tx + 12} ${y} Z`).attr('fill', fill)
-    }
-    return
-  }
-  if (kind === 'savanna') {
-    g.append('line').attr('x1', x + 8).attr('x2', x + 8).attr('y1', y).attr('y2', y - 16).attr('stroke', '#5a4030').attr('stroke-width', 2)
-    g.append('ellipse').attr('cx', x + 8).attr('cy', y - 20).attr('rx', 10).attr('ry', 6).attr('fill', fill)
-    g.append('rect').attr('x', x + 22).attr('y', y - 6).attr('width', 20).attr('height', 4).attr('fill', '#6a8a3a')
-    return
-  }
-  g.append('line').attr('x1', x + 10).attr('x2', x + 10).attr('y1', y).attr('y2', y - 14).attr('stroke', '#5a4030').attr('stroke-width', 2)
-  g.append('circle').attr('cx', x + 10).attr('cy', y - 22).attr('r', 10).attr('fill', fill)
-  g.append('line').attr('x1', x + 28).attr('x2', x + 28).attr('y1', y).attr('y2', y - 12).attr('stroke', '#5a4030').attr('stroke-width', 2)
-  g.append('circle').attr('cx', x + 28).attr('cy', y - 20).attr('r', 8).attr('fill', fill)
-}
 
 function redraw() {
   if (disposed) return
-  if (mode.value === 'vertical') return
+  if (mode.value === 'vertical' || mode.value === 'local') return
   if (mode.value === 'longitudinal') drawLon()
   else drawLat()
 }
@@ -824,7 +779,7 @@ watch([() => props.stepId], () => {
   requestAnimationFrame(redraw)
 })
 
-watch([latHi, lonHi, vertHi, hoverLat, hoverLon, hoverVert], () => {
+watch([latHi, lonHi, hoverLat, hoverLon], () => {
   requestAnimationFrame(redraw)
 })
 
@@ -842,30 +797,10 @@ onUnmounted(() => {
 
 <template>
   <div v-if="mode === 'vertical'" class="vertical-stage">
-    <div class="vertical-tabs" role="tablist" aria-label="垂直自然带场景模式">
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="verticalView === 'cinematic'"
-        :class="{ active: verticalView === 'cinematic' }"
-        @click="verticalView = 'cinematic'"
-      >
-        <span>沉浸式 2.5D</span>
-        <small>照片级教学场景</small>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="verticalView === 'terrain'"
-        :class="{ active: verticalView === 'terrain' }"
-        @click="verticalView = 'terrain'"
-      >
-        <span>真实地形 3D</span>
-        <small>Cesium 自由浏览</small>
-      </button>
-    </div>
-    <CinematicTerrain v-if="verticalView === 'cinematic'" />
-    <CesiumTerrain v-else />
+    <CinematicTerrain />
+  </div>
+  <div v-else-if="mode === 'local'" class="local-stage">
+    <LocalTerrain />
   </div>
   <div v-else class="wrap">
     <div class="toolbar">
@@ -880,6 +815,7 @@ onUnmounted(() => {
       </template>
     </div>
     <svg ref="svgRef" class="canvas" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="xMidYMid meet" />
+    <div class="schematic-note">自然带是气候、植被、土壤等要素的综合表现 · 本图为理想化样带，实际分布还受海陆位置、环流和地形影响</div>
   </div>
   <Teleport to="body">
     <Transition name="biome-lightbox">
@@ -927,7 +863,7 @@ onUnmounted(() => {
   height: 100%;
   min-height: 480px;
   overflow: hidden;
-  background: #06111d;
+  background: var(--demo-canvas);
 }
 .vertical-tabs {
   position: absolute;
@@ -951,14 +887,14 @@ onUnmounted(() => {
   padding: 8px 14px;
   border: 0;
   border-radius: 9px;
-  color: #a9bdcb;
+  color: var(--demo-ink-dim);
   background: transparent;
   font: inherit;
   cursor: pointer;
 }
 .vertical-tabs button.active {
-  color: #fff;
-  background: linear-gradient(180deg, #3f9ddd, #226faa);
+  color: var(--demo-ink);
+  background: linear-gradient(180deg, var(--demo-cold-soft), var(--demo-accent));
   box-shadow: 0 4px 14px rgb(25 130 207 / 32%);
 }
 .vertical-tabs span { font-size: 12px; font-weight: 700; }
@@ -968,10 +904,25 @@ onUnmounted(() => {
   .vertical-tabs button { min-width: 112px; padding: 7px 9px; }
 }
 .wrap {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-canvas);
+}
+.schematic-note {
+  position: absolute;
+  right: 12px;
+  bottom: 7px;
+  color: var(--demo-ink-dim);
+  font-size: 9px;
+}
+.local-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  overflow: hidden;
 }
 .toolbar {
   display: flex;
@@ -1020,14 +971,14 @@ onUnmounted(() => {
   overflow: hidden;
   border: 1px solid rgb(198 226 240 / 26%);
   border-radius: 18px;
-  background: #07131e;
+  background: var(--demo-panel);
   box-shadow: 0 28px 90px rgb(0 0 0 / 55%);
 }
 .biome-lightbox__gallery {
   display: grid;
   grid-template-columns: 1.35fr 1fr;
   height: min(64vh, 650px);
-  background: #02080d;
+  background: var(--demo-canvas);
 }
 .biome-lightbox__media {
   position: relative;
@@ -1042,7 +993,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #02080d;
+  background: var(--demo-canvas);
 }
 .biome-lightbox__media > span {
   position: absolute;
@@ -1051,7 +1002,7 @@ onUnmounted(() => {
   padding: 5px 9px;
   border: 1px solid rgb(255 255 255 / 18%);
   border-radius: 999px;
-  color: #f4f8fc;
+  color: var(--demo-ink);
   background: rgb(3 12 19 / 76%);
   font-size: 11px;
   font-weight: 600;
@@ -1063,7 +1014,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 24px;
   padding: 16px 20px 18px;
-  color: #eaf5fb;
+  color: var(--demo-ink);
 }
 .biome-lightbox__figure figcaption > div {
   display: grid;
@@ -1074,11 +1025,11 @@ onUnmounted(() => {
 }
 .biome-lightbox__figure span,
 .biome-lightbox__figure a {
-  color: #9fb9c8;
+  color: var(--demo-ink-dim);
   font-size: 12px;
 }
 .biome-lightbox__figure a:hover {
-  color: #d8f0ff;
+  color: var(--demo-accent-soft);
 }
 .biome-lightbox__meta {
   text-align: right;
@@ -1092,7 +1043,7 @@ onUnmounted(() => {
   height: 38px;
   border: 1px solid rgb(255 255 255 / 32%);
   border-radius: 50%;
-  color: #fff;
+  color: var(--demo-ink);
   background: rgb(3 12 19 / 72%);
   font-size: 26px;
   line-height: 1;

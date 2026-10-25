@@ -56,6 +56,7 @@
   --demo-canvas: #070b16;
   --demo-canvas-fog: #0a1020;
   --demo-panel: #10182a;
+  --demo-ground: #24382c;
   --demo-ink: #eef3f7;
   --demo-ink-muted: #c5d4e4;
   --demo-ink-dim: #8aa0b4;
@@ -66,6 +67,16 @@
   --demo-lift: #f0d078;
   --demo-sink: #c9a227;
   --demo-rain: #9ec9e8;
+  --demo-air: #9ec9e8;
+  --demo-water: #5eb4e8;
+  --demo-vegetation: #5fa873;
+  --demo-soil: #b8865b;
+  --demo-rock: #9a9186;
+  --demo-biome-forest: #2f7a50;
+  --demo-biome-grass: #8faa4a;
+  --demo-biome-desert: #c4a06a;
+  --demo-biome-tundra: #7a9a8a;
+  --demo-biome-ice: #d0dce8;
   --demo-low: #4aa3d9;
   --demo-high: #e8a317;
   --demo-high-soft: #f0c14a;

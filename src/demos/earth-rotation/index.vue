@@ -248,8 +248,6 @@ let lastT = 0
 /** day-night | sphere | basics | timezones */
 let threeMode: 'day-night' | 'sphere' | 'basics' | 'timezones' | null = null
 let tzMarkerGroup: THREE.Group | null = null
-let tzEarthMaterial: THREE.ShaderMaterial | null = null
-let tzAtmosphereMaterial: THREE.ShaderMaterial | null = null
 let activeEarth: RealisticEarth | null = null
 let dateShipGroup: THREE.Group | null = null
 let dateShipMesh: THREE.Mesh | null = null
@@ -382,8 +380,6 @@ function teardownThree() {
   sceneAmbient = null
   sceneFill = null
   tzMarkerGroup = null
-  tzEarthMaterial = null
-  tzAtmosphereMaterial = null
   activeEarth = null
   dateShipGroup = null
   dateShipMesh = null
@@ -486,25 +482,6 @@ function latLonToVec(lat: number, lon: number, r: number) {
   return new THREE.Vector3(c * Math.cos(λ), Math.sin(φ), -c * Math.sin(λ)).multiplyScalar(r)
 }
 
-function buildEarthSphere(R: number) {
-  const loader = new THREE.TextureLoader()
-  const dayTex = loader.load('/textures/earth-blue-marble.jpg')
-  dayTex.colorSpace = THREE.SRGBColorSpace
-  const nightTex = loader.load('/textures/earth-night.jpg')
-  nightTex.colorSpace = THREE.SRGBColorSpace
-  return new THREE.Mesh(
-    new THREE.SphereGeometry(R, 72, 56),
-    new THREE.MeshPhongMaterial({
-      map: dayTex,
-      emissiveMap: nightTex,
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.45,
-      shininess: 12,
-      specular: new THREE.Color(0x335566),
-    }),
-  )
-}
-
 function addRealisticEarth(
   parent: THREE.Object3D,
   radius: number,
@@ -518,127 +495,6 @@ function addRealisticEarth(
   parent.add(addDisposable(model.atmosphere))
   activeEarth = model
   return model
-}
-
-/**
- * 真实地球底层：按太阳方向混合 NASA 日景与夜间灯光。
- * 使用物体局部法线，保证时区教学旋转镜头时，昼夜分界仍和经度保持一致。
- */
-function buildRealisticEarth(R: number, sunDirection: THREE.Vector3) {
-  const loader = new THREE.TextureLoader()
-  const dayTex = loader.load('/textures/earth-blue-marble.jpg')
-  const nightTex = loader.load('/textures/earth-night.jpg')
-  dayTex.colorSpace = THREE.SRGBColorSpace
-  nightTex.colorSpace = THREE.SRGBColorSpace
-  if (renderer) {
-    const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
-    dayTex.anisotropy = anisotropy
-    nightTex.anisotropy = anisotropy
-  }
-
-  tzEarthMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      dayMap: { value: dayTex },
-      nightMap: { value: nightTex },
-      sunDirection: { value: sunDirection.clone().normalize() },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      varying vec3 vLocalNormal;
-      varying vec3 vViewNormal;
-      varying vec3 vViewPosition;
-      void main() {
-        vUv = uv;
-        vLocalNormal = normalize(normal);
-        vViewNormal = normalize(normalMatrix * normal);
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        gl_Position = projectionMatrix * mvPosition;
-      }
-    `,
-    fragmentShader: `
-      uniform sampler2D dayMap;
-      uniform sampler2D nightMap;
-      uniform vec3 sunDirection;
-      varying vec2 vUv;
-      varying vec3 vLocalNormal;
-      varying vec3 vViewNormal;
-      varying vec3 vViewPosition;
-
-      void main() {
-        vec3 dayColor = texture2D(dayMap, vUv).rgb;
-        vec3 nightColor = texture2D(nightMap, vUv).rgb;
-        float sunlight = dot(normalize(vLocalNormal), normalize(sunDirection));
-        float dayMix = smoothstep(-0.12, 0.18, sunlight);
-        float diffuse = 0.34 + 0.82 * max(sunlight, 0.0);
-
-        vec3 color = dayColor * diffuse * dayMix;
-        color += dayColor * 0.028 * (1.0 - dayMix);
-        color += nightColor * 1.35 * (1.0 - dayMix);
-
-        // 晨昏带的暖色散射，避免昼夜分界像硬切贴纸。
-        float twilight = (1.0 - smoothstep(0.0, 0.16, abs(sunlight))) * 0.22;
-        color += vec3(0.30, 0.085, 0.025) * twilight;
-
-        // 海洋在掠射角下的微弱高光。
-        vec3 viewDir = normalize(vViewPosition);
-        float rim = pow(1.0 - max(dot(normalize(vViewNormal), viewDir), 0.0), 3.2);
-        float ocean = smoothstep(0.015, 0.16, dayColor.b - dayColor.r);
-        color += vec3(0.08, 0.20, 0.32) * rim * ocean * dayMix * 0.42;
-
-        gl_FragColor = vec4(color, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }
-    `,
-  })
-
-  return new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), tzEarthMaterial)
-}
-
-/** 近地大气：视线切过球体边缘时增强，并在向阳面呈现蓝色散射。 */
-function buildAtmosphereShell(R: number, sunDirection: THREE.Vector3) {
-  tzAtmosphereMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      sunDirection: { value: sunDirection.clone().normalize() },
-    },
-    vertexShader: `
-      varying vec3 vLocalNormal;
-      varying vec3 vViewNormal;
-      varying vec3 vViewPosition;
-      void main() {
-        vLocalNormal = normalize(normal);
-        vViewNormal = normalize(normalMatrix * normal);
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        gl_Position = projectionMatrix * mvPosition;
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 sunDirection;
-      varying vec3 vLocalNormal;
-      varying vec3 vViewNormal;
-      varying vec3 vViewPosition;
-      void main() {
-        vec3 viewDir = normalize(vViewPosition);
-        float fresnel = pow(1.0 - max(dot(normalize(vViewNormal), viewDir), 0.0), 3.1);
-        float sunFacing = smoothstep(-0.32, 0.42, dot(normalize(vLocalNormal), normalize(sunDirection)));
-        float alpha = fresnel * (0.18 + 0.82 * sunFacing) * 0.88;
-        vec3 color = mix(vec3(0.035, 0.17, 0.42), vec3(0.20, 0.68, 1.0), sunFacing);
-        gl_FragColor = vec4(color, alpha);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.FrontSide,
-  })
-  const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(R * 1.045, 96, 72), tzAtmosphereMaterial)
-  atmosphere.name = 'tz-atmosphere'
-  atmosphere.renderOrder = 3
-  return atmosphere
 }
 
 function tubeMat(color: number, opacity = 1) {
@@ -2649,8 +2505,6 @@ function setupTimezones() {
   })
   // 时区教学图以边界辨识为主，不显示地球外侧的大气光膜。
   if (timeEarth) timeEarth.atmosphere.visible = false
-  tzEarthMaterial = timeEarth?.surface.material ?? null
-  tzAtmosphereMaterial = timeEarth?.atmosphere.material ?? null
 
   // 赤道 + 本初子午（主框架）
   globeRoot.add(addDisposable(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.85)))

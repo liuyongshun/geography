@@ -45,6 +45,18 @@ export const DemoHex = {
   rainDrop: '#b8dce8',
   cloud: '#d8e4f0',
 
+  /** 自然环境要素与地域分异 */
+  air: '#9ec9e8',
+  water: '#5eb4e8',
+  vegetation: '#5fa873',
+  soil: '#b8865b',
+  rock: '#9a9186',
+  biomeForest: '#2f7a50',
+  biomeGrass: '#8faa4a',
+  biomeDesert: '#c4a06a',
+  biomeTundra: '#7a9a8a',
+  biomeIce: '#d0dce8',
+
   /** 气压系统（与 --geo-low / --geo-high 对齐） */
   low: '#4aa3d9',
   lowBright: '#5eb4e8',
@@ -188,6 +200,16 @@ export const Demo3 = {
   rain: hexToInt(DemoHex.rain),
   rainDrop: hexToInt(DemoHex.rainDrop),
   cloud: hexToInt(DemoHex.cloud),
+  air: hexToInt(DemoHex.air),
+  water: hexToInt(DemoHex.water),
+  vegetation: hexToInt(DemoHex.vegetation),
+  soil: hexToInt(DemoHex.soil),
+  rock: hexToInt(DemoHex.rock),
+  biomeForest: hexToInt(DemoHex.biomeForest),
+  biomeGrass: hexToInt(DemoHex.biomeGrass),
+  biomeDesert: hexToInt(DemoHex.biomeDesert),
+  biomeTundra: hexToInt(DemoHex.biomeTundra),
+  biomeIce: hexToInt(DemoHex.biomeIce),
 
   low: hexToInt(DemoHex.low),
   lowBright: hexToInt(DemoHex.lowBright),

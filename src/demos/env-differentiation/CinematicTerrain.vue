@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { DemoHex } from '@/demos/theme'
 
 interface Specimen {
   name: string
   note: string
-  icon: string
-  image?: string
-  video?: string
-  videoCredit?: string
+  image: string
+  sourceUrl: string
+  credit: string
 }
 
 interface Zone {
@@ -40,29 +40,15 @@ const ZONES: Zone[] = [
     precip: '300–600 mm',
     climate: '终年严寒，冻融作用强',
     description: '山顶热量不足，冰雪长期保留，植被极少。',
-    color: '#eaf6ff',
+    color: DemoHex.biomeIce,
     guidePath: 'M446 135 C 535 144, 628 157, 748 181',
     focusX: 623,
     focusY: 157,
     marker: '5,000 m',
     labelTop: '16%',
     labelLeft: '38%',
-    plants: [
-      { name: '雪莲', note: '绒毛减少热量散失，贴近地面生长', icon: '❉', image: '/images/biomes/plants/plant-arctic-willow.jpg' },
-      { name: '垫状点地梅', note: '形成紧密垫状体，抵御强风和低温', icon: '✿' },
-    ],
-    animals: [
-      {
-        name: '雪豹', note: '厚毛、宽大足垫，适应高寒岩坡', icon: '🐆',
-        video: '/videos/animals/snow-leopard.webm',
-        videoCredit: '印度喜马偕尔邦斯皮提的野生雪豹，红外相机拍摄。Rishi Sharma · CC BY 3.0',
-      },
-      {
-        name: '岩羊', note: '蹄缘坚硬，善于在陡峭裸岩活动', icon: '🐐',
-        video: '/videos/animals/alpine-ibex.webm',
-        videoCredit: '实拍为阿尔卑斯羱羊在岩坡活动，与岩羊同为羊亚科。Tobias Gasser · CC BY-SA 2.5',
-      },
-    ],
+    plants: [{ name: '北极柳', note: '贴近地面生长，可抵御强风与低温', image: '/images/biomes/plants/plant-arctic-willow.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Salix_arctica_-_Arctic_willow.jpg', credit: 'Wikimedia Commons · CC BY-SA 2.0' }],
+    animals: [{ name: '雪豹', note: '厚毛、宽大足垫，适应高寒岩坡', image: '/images/animals/snow-leopard.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Snow_leopard_portrait-2010-07-09.jpg', credit: 'Tambako The Jaguar · CC BY-SA 2.0' }],
   },
   {
     id: 'desert',
@@ -73,25 +59,15 @@ const ZONES: Zone[] = [
     precip: '300–700 mm',
     climate: '风力强，昼夜温差大',
     description: '强风和冻融作用频繁，地表以裸岩、碎屑为主。',
-    color: '#b9c7d2',
+    color: DemoHex.rock,
     guidePath: 'M414 226 C 530 230, 648 250, 802 278',
     focusX: 650,
     focusY: 250,
     marker: '4,000 m',
     labelTop: '28%',
     labelLeft: '41%',
-    plants: [
-      { name: '高山蒿', note: '叶片细小，被毛可降低蒸腾', icon: '❋', image: '/images/biomes/plants/plant-feather-grass.jpg' },
-      { name: '高山紫菀', note: '生长期短，花期集中于暖季', icon: '✾' },
-    ],
-    animals: [
-      {
-        name: '高原鼠兔', note: '穴居避寒，是高原食物网关键种', icon: '🐇',
-        video: '/videos/animals/american-pika.webm',
-        videoCredit: '实拍为北美鼠兔在落基山碎石间取食，与高原鼠兔同属。mark byzewski · CC BY 2.0',
-      },
-      { name: '藏原羚', note: '耐缺氧，季节性迁移寻找食物', icon: '🦌' },
-    ],
+    plants: [{ name: '针茅', note: '叶片细长，可减少蒸腾与强风损伤', image: '/images/biomes/plants/plant-feather-grass.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Stipa_capillata_kz07.jpg', credit: 'Krzysztof Ziarnek · Wikimedia Commons' }],
+    animals: [{ name: '高原鼠兔（近缘种）', note: '穴居避寒，是高原食物网关键种；图片为北美鼠兔', image: '/images/animals/pika.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:American_Pika_collecting_Antennaria,_Wallowa-Whitman_National_Forest_(26528816780).jpg', credit: 'Mark Penninger, U.S. Forest Service · Public Domain' }],
   },
   {
     id: 'meadow',
@@ -102,29 +78,15 @@ const ZONES: Zone[] = [
     precip: '300–800 mm',
     climate: '气温低，风力强，紫外线强',
     description: '在高海拔、低温和强风环境下，植物低矮，生长季短。',
-    color: '#61b8ff',
+    color: DemoHex.biomeGrass,
     guidePath: 'M396 405 C 520 394, 655 416, 815 430',
     focusX: 655,
     focusY: 416,
     marker: '3,000 m',
     labelTop: '43%',
     labelLeft: '45%',
-    plants: [
-      { name: '高山嵩草', note: '根系发达，形成致密草毡层', icon: '♒', image: '/images/biomes/plants/plant-feather-grass.jpg' },
-      { name: '龙胆', note: '植株低矮，花色鲜艳吸引传粉昆虫', icon: '✿' },
-    ],
-    animals: [
-      {
-        name: '喜马拉雅旱獭', note: '冬眠越冬，暖季集中取食', icon: '🦫',
-        video: '/videos/animals/alpine-marmot-foraging.webm',
-        videoCredit: '实拍为阿尔卑斯旱獭在瑞士高山取食，与喜马拉雅旱獭同属。Marcel Zurreck · CC BY 4.0',
-      },
-      {
-        name: '高山兀鹫', note: '利用山谷上升气流长距离滑翔', icon: '🦅',
-        video: '/videos/animals/himalayan-vulture.webm',
-        videoCredit: '喜马拉雅兀鹫实拍，地点为科威特。Alahamali70 · CC BY-SA 4.0',
-      },
-    ],
+    plants: [{ name: '高山嵩草', note: '根系发达，形成致密草毡层', image: '/images/biomes/plants/plant-feather-grass.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Stipa_capillata_kz07.jpg', credit: 'Krzysztof Ziarnek · Wikimedia Commons' }],
+    animals: [{ name: '喜马拉雅旱獭（近缘种）', note: '冬眠越冬，暖季集中取食；图片为阿尔卑斯旱獭', image: '/images/animals/marmot.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:071_Wild_marmot_at_Grand_Muveran_Nature_Reserve_Photo_by_Giles_Laurent.jpg', credit: 'Giles Laurent · CC BY-SA 4.0' }],
   },
   {
     id: 'conifer',
@@ -135,25 +97,15 @@ const ZONES: Zone[] = [
     precip: '500–1000 mm',
     climate: '冷湿，山地降水较多',
     description: '水分条件较好，耐寒针叶树种形成连续森林。',
-    color: '#d8f0ff',
+    color: DemoHex.biomeForest,
     guidePath: 'M360 525 C 520 520, 690 548, 915 566',
     focusX: 690,
     focusY: 548,
     marker: '2,000 m',
     labelTop: '57%',
     labelLeft: '51%',
-    plants: [
-      { name: '云杉', note: '塔形树冠利于积雪滑落', icon: '▲', image: '/images/biomes/plants/plant-black-spruce.jpg' },
-      { name: '冷杉', note: '叶片针状、表皮厚，耐寒耐湿', icon: '♠' },
-    ],
-    animals: [
-      {
-        name: '红松鼠', note: '取食种子，也参与森林种子传播', icon: '🐿️',
-        video: '/videos/animals/red-squirrel.webm',
-        videoCredit: '欧亚红松鼠在树上取食浆果。Roberto Verzo · CC BY 3.0',
-      },
-      { name: '林麝', note: '善于在针叶林下隐蔽活动', icon: '🦌' },
-    ],
+    plants: [{ name: '黑云杉', note: '塔形树冠利于积雪滑落', image: '/images/biomes/plants/plant-black-spruce.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Picea_mariana_cone.JPG', credit: 'Tilo Podner · CC BY-SA 3.0' }],
+    animals: [{ name: '红松鼠', note: '取食种子，也参与森林种子传播', image: '/images/animals/red-squirrel.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Squirrel_posing.jpg', credit: 'Peter Trimming · CC BY 2.0' }],
   },
   {
     id: 'mixed',
@@ -164,25 +116,15 @@ const ZONES: Zone[] = [
     precip: '800–1400 mm',
     climate: '温和湿润，水热条件好',
     description: '热量与水分条件相对优越，森林群落结构复杂。',
-    color: '#edf8ff',
+    color: DemoHex.vegetation,
     guidePath: 'M326 645 C 500 630, 718 660, 984 704',
     focusX: 735,
     focusY: 663,
     marker: '1,000 m',
     labelTop: '68%',
     labelLeft: '54%',
-    plants: [
-      { name: '青冈', note: '常绿革质叶，适应湿润环境', icon: '●', image: '/images/biomes/plants/plant-oak.jpg' },
-      { name: '山茶', note: '林下耐阴，叶片常绿', icon: '✿', image: '/images/biomes/plants/plant-camellia.jpg' },
-    ],
-    animals: [
-      {
-        name: '红腹锦鸡', note: '活动于灌丛和林下，食物多样', icon: '🦚',
-        video: '/videos/animals/golden-pheasant.webm',
-        videoCredit: '红腹锦鸡实拍，画面中有笼网。Andrew Simone · CC BY 2.0',
-      },
-      { name: '猕猴', note: '杂食性，随季节改变取食层位', icon: '🐒' },
-    ],
+    plants: [{ name: '山茶', note: '林下耐阴，叶片常绿', image: '/images/biomes/plants/plant-camellia.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Camellia-japonica.jpg', credit: 'Nagahitoyuki · Wikimedia Commons' }],
+    animals: [{ name: '红腹锦鸡', note: '活动于灌丛和林下，食物多样', image: '/images/animals/golden-pheasant.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Chrysolophus_pictus_MHNT.jpg', credit: 'Didier Descouens · CC BY-SA 3.0' }],
   },
   {
     id: 'valley',
@@ -193,29 +135,15 @@ const ZONES: Zone[] = [
     precip: '700–1200 mm',
     climate: '温暖，河谷水分充足',
     description: '河谷地形聚水，温度较高，构成山地垂直自然带的基带。',
-    color: '#edf8ff',
+    color: DemoHex.vegetation,
     guidePath: 'M286 770 C 505 748, 770 766, 1110 814',
     focusX: 900,
     focusY: 786,
     marker: '500 m',
     labelTop: '78%',
     labelLeft: '58%',
-    plants: [
-      { name: '栎类', note: '乔木层发达，形成连续林冠', icon: '♣', image: '/images/biomes/plants/plant-oak.jpg' },
-      { name: '河岸柳', note: '根系耐水湿，稳固河岸土壤', icon: '⌇', image: '/images/biomes/plants/plant-birch.jpg' },
-    ],
-    animals: [
-      {
-        name: '梅花鹿', note: '林缘与河谷草地提供食物和水源', icon: '🦌',
-        video: '/videos/animals/sika-deer.webm',
-        videoCredit: '实拍为北海道钏路的虾夷梅花鹿，是梅花鹿的亚种。Nesnad · CC BY 4.0',
-      },
-      {
-        name: '画眉', note: '灌丛层栖息，取食昆虫和浆果', icon: '🐦',
-        video: '/videos/animals/hwamei.webm',
-        videoCredit: '画眉实拍，地点为日本横滨。ContributorQ · CC BY 3.0',
-      },
-    ],
+    plants: [{ name: '欧洲白桦', note: '根系耐水湿，能稳固河岸土壤', image: '/images/biomes/plants/plant-birch.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:Betula_pendula_leaves.jpg', credit: 'Nefronus · CC0' }],
+    animals: [{ name: '梅花鹿', note: '林缘与河谷草地提供食物和水源', image: '/images/animals/sika-deer.jpg', sourceUrl: 'https://commons.wikimedia.org/wiki/File:%D0%9F%D0%BE%D1%80%D1%82%D1%80%D0%B5%D1%82_%D0%BE%D0%BB%D0%B5%D0%BD%D1%8F.jpg', credit: 'Byrdyak · CC BY-SA 4.0' }],
   },
 ]
 
@@ -227,7 +155,8 @@ interface KeyLine {
   note: string
   guidePath: string
   labelTop: string
-  labelLeft: string
+  labelLeft?: string
+  labelRight?: string
   /** 点击后打开的相邻自然带 */
   zoneId: string
   /** 左侧海拔轴上的大致位置（相对轴轨） */
@@ -255,7 +184,8 @@ const KEY_LINES: KeyLine[] = [
     // 与针叶林上缘 / 草甸下缘（3,000 m）导引线同高程
     guidePath: 'M396 405 C 520 394, 655 416, 815 430',
     labelTop: '40%',
-    labelLeft: '66%',
+    // 与雪线标签相对控制点的横向偏移一致，避免压住 3,000 m 控制点。
+    labelLeft: '62%',
     zoneId: 'conifer',
     axisTop: '51%',
   },
@@ -266,14 +196,12 @@ const selectedId = ref('meadow')
 const selectedKeyId = ref<'treeline' | 'snowline' | null>('treeline')
 const activeTab = ref<'climate' | 'plants' | 'animals' | 'landscape'>('climate')
 const panelOpen = ref(true)
+const preview = ref<Specimen | null>(null)
 const tiltX = ref(0)
 const tiltY = ref(0)
-const activeAnimalIndex = ref(0)
 
 const zone = computed(() => ZONES.find((item) => item.id === selectedId.value) ?? ZONES[2]!)
 const activeKeyLine = computed(() => KEY_LINES.find((item) => item.id === selectedKeyId.value) ?? null)
-const activeAnimal = computed(() => zone.value.animals[activeAnimalIndex.value] ?? zone.value.animals[0]!)
-const hasFilm = computed(() => zone.value.animals.some((item) => item.video))
 const sceneStyle = computed(() => ({
   '--look-x': `${tiltX.value}px`,
   '--look-y': `${tiltY.value}px`,
@@ -282,8 +210,8 @@ const sceneStyle = computed(() => ({
 function trackPointer(event: PointerEvent) {
   const node = event.currentTarget as HTMLElement
   const rect = node.getBoundingClientRect()
-  tiltX.value = ((event.clientX - rect.left) / rect.width - 0.5) * 34
-  tiltY.value = ((event.clientY - rect.top) / rect.height - 0.5) * 20
+  tiltX.value = ((event.clientX - rect.left) / rect.width - 0.5) * 52
+  tiltY.value = ((event.clientY - rect.top) / rect.height - 0.5) * 32
 }
 
 function keyLineForZone(id: string): KeyLine['id'] | null {
@@ -301,7 +229,6 @@ function zoneGuideActive(item: Zone) {
 function selectZone(id: string) {
   selectedId.value = id
   selectedKeyId.value = keyLineForZone(id)
-  activeAnimalIndex.value = 0
   panelOpen.value = true
 }
 
@@ -310,7 +237,6 @@ function selectKeyLine(id: KeyLine['id']) {
   if (!line) return
   selectedKeyId.value = id
   selectedId.value = line.zoneId
-  activeAnimalIndex.value = 0
   panelOpen.value = true
 }
 
@@ -403,7 +329,7 @@ function resetPointer() {
       :key="`key-label-${line.id}`"
       class="key-label"
       :class="[line.id, { selected: selectedKeyId === line.id }]"
-      :style="{ top: line.labelTop, left: line.labelLeft }"
+      :style="{ top: line.labelTop, left: line.labelLeft, right: line.labelRight }"
       type="button"
       :aria-label="`查看${line.name}`"
       :title="line.note"
@@ -429,54 +355,27 @@ function resetPointer() {
         <button type="button" :class="{ active: activeTab === 'landscape' }" @click="activeTab = 'landscape'">景观特点</button>
       </div>
       <div v-if="activeTab === 'climate'" class="facts">
-        <p><i>℃</i><span>年平均气温</span><b>{{ zone.temp }}</b></p>
-        <p><i>❄</i><span>年降水量</span><b>{{ zone.precip }}</b></p>
+        <p><i>℃</i><span>示意年均温</span><b>{{ zone.temp }}</b></p>
+        <p><i>❄</i><span>示意年降水量</span><b>{{ zone.precip }}</b></p>
         <p><i>≈</i><span>气候特点</span><b>{{ zone.climate }}</b></p>
       </div>
       <div v-else-if="activeTab === 'plants'" class="specimen-grid">
-        <article
+        <button
           v-for="item in zone.plants"
           :key="item.name"
           class="specimen"
+          type="button"
+          @click="preview = item"
         >
-          <div v-if="item.image" class="specimen-image" :style="{ backgroundImage: `url(${item.image})` }" />
-          <i v-else class="specimen-icon" aria-hidden="true">{{ item.icon }}</i>
+          <div class="specimen-image" :style="{ backgroundImage: `url(${item.image})` }" />
           <span><b>{{ item.name }}</b><small>{{ item.note }}</small></span>
-        </article>
+        </button>
       </div>
-      <div v-else-if="activeTab === 'animals'" class="animal-explorer">
-        <figure v-if="activeAnimal.video" class="animal-film">
-          <video
-            :key="activeAnimal.video"
-            :src="activeAnimal.video"
-            autoplay
-            muted
-            loop
-            playsinline
-            disablepictureinpicture
-            :aria-label="`${activeAnimal.name}实拍`"
-          />
-          <figcaption>{{ activeAnimal.videoCredit }}</figcaption>
-        </figure>
-        <p v-else-if="hasFilm" class="animal-missing">这段还没有合适的开放授权实拍。</p>
-        <div v-if="hasFilm" class="animal-switch" role="group" aria-label="选择动物实拍">
-          <button
-            v-for="(item, index) in zone.animals"
-            :key="item.name"
-            type="button"
-            :class="{ active: activeAnimalIndex === index }"
-            @click="activeAnimalIndex = index"
-          >
-            <i aria-hidden="true">{{ item.icon }}</i>
+      <div v-else-if="activeTab === 'animals'" class="specimen-grid">
+          <button v-for="item in zone.animals" :key="item.name" type="button" class="specimen" @click="preview = item">
+            <div class="specimen-image" :style="{ backgroundImage: `url(${item.image})` }" />
             <span><b>{{ item.name }}</b><small>{{ item.note }}</small></span>
           </button>
-        </div>
-        <div v-else class="specimen-grid">
-          <article v-for="item in zone.animals" :key="item.name" class="specimen">
-            <i class="specimen-icon" aria-hidden="true">{{ item.icon }}</i>
-            <span><b>{{ item.name }}</b><small>{{ item.note }}</small></span>
-          </article>
-        </div>
       </div>
       <p v-else class="tab-copy">
         {{ zone.short }}。景观沿海拔方向呈明显带状更替，界线会因坡向、水分和局地地形而上下波动。
@@ -484,7 +383,14 @@ function resetPointer() {
     </aside>
     <button v-else class="reopen glass" type="button" @click="panelOpen = true">自然带详情</button>
 
-    <div class="cinematic-note">2.5D 沉浸演示 · 固定教学机位</div>
+    <div class="cinematic-note">课堂示意 · 虚构山系与示意数值 · 非实拍、非实测地形、非卫星正射图</div>
+    <div v-if="preview" class="specimen-preview" role="dialog" aria-modal="true" :aria-label="`${preview.name}图片预览`" @click.self="preview = null">
+      <figure>
+        <button type="button" aria-label="关闭图片预览" @click="preview = null">×</button>
+        <img :src="preview.image" :alt="`${preview.name}真实图片`" />
+        <figcaption><b>{{ preview.name }}</b><span>{{ preview.note }}</span><a :href="preview.sourceUrl" target="_blank" rel="noreferrer">{{ preview.credit }}</a></figcaption>
+      </figure>
+    </div>
   </div>
 </template>
 
@@ -498,7 +404,7 @@ function resetPointer() {
   min-height: 480px;
   overflow: hidden;
   color: var(--knowledge-body);
-  background: #17334f;
+  background: var(--demo-canvas);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 .plate {
@@ -509,7 +415,7 @@ function resetPointer() {
   will-change: transform;
 }
 .plate {
-  transform: translate3d(calc(var(--look-x) * -.3), calc(var(--look-y) * -.24), 0) scale(1.07);
+  transform: translate3d(calc(var(--look-x) * -.55), calc(var(--look-y) * -.45), 0) scale(1.12);
 }
 .cloud {
   position: absolute;
@@ -534,7 +440,7 @@ function resetPointer() {
 @keyframes drift { to { transform: translate3d(30px, -7px, 0) scale(1.08); } }
 .glass {
   border: 1px solid rgb(182 220 245 / 17%);
-  background: linear-gradient(145deg, rgb(18 47 77 / 90%), rgb(8 28 48 / 82%));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--demo-panel) 92%, var(--demo-accent)), color-mix(in srgb, var(--demo-canvas) 82%, transparent));
   box-shadow: 0 16px 38px rgb(0 10 22 / 28%);
   backdrop-filter: blur(14px) saturate(1.15);
 }
@@ -552,7 +458,7 @@ function resetPointer() {
 .brand strong { display: block; color: var(--knowledge-title); font-size: 20px; letter-spacing: .03em; }
 .brand small { display: block; margin-top: 3px; color: var(--knowledge-muted); font-size: 10px; }
 .mountain-mark { position: relative; width: 52px; height: 36px; }
-.mountain-mark i { position: absolute; bottom: 0; width: 36px; height: 30px; background: #f5fbff; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.mountain-mark i { position: absolute; bottom: 0; width: 36px; height: 30px; background: var(--demo-ink); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .mountain-mark i:first-child { left: 0; }
 .mountain-mark i:last-child { right: 0; height: 23px; opacity: .9; }
 .elevation {
@@ -590,15 +496,15 @@ function resetPointer() {
   width: 10px;
   height: 10px;
   margin-left: 2px;
-  border: 2px solid #ddecf6;
+  border: 2px solid var(--demo-ink-muted);
   border-radius: 50%;
   background: rgb(130 158 180 / 80%);
   box-shadow: 0 0 0 3px rgb(255 255 255 / 12%);
 }
 .elevation > button:not(.key-tick) span { display: grid; gap: 2px; font-size: 11px; }
 .elevation > button:not(.key-tick) b { font-size: 12px; font-weight: 500; }
-.elevation > button:not(.key-tick).active { color: var(--knowledge-data); text-shadow: 0 1px 8px #2b9fff; }
-.elevation > button:not(.key-tick).active > i { background: #52aaff; border-color: #fff; box-shadow: 0 0 0 5px rgb(54 156 255 / 36%), 0 0 18px #4daaff; }
+.elevation > button:not(.key-tick).active { color: var(--knowledge-data); text-shadow: 0 1px 8px var(--demo-accent); }
+.elevation > button:not(.key-tick).active > i { background: var(--demo-accent); border-color: var(--demo-ink); box-shadow: 0 0 0 5px color-mix(in srgb, var(--demo-accent) 36%, transparent), 0 0 18px var(--demo-accent); }
 .elevation > button:not(.key-tick).active b { font-weight: 700; }
 .key-tick {
   position: absolute;
@@ -609,7 +515,7 @@ function resetPointer() {
   gap: 6px;
   padding: 0;
   border: 0;
-  color: #f0d078;
+  color: var(--demo-lift);
   background: transparent;
   cursor: pointer;
   transform: translateY(-50%);
@@ -617,7 +523,7 @@ function resetPointer() {
 .key-tick > i {
   width: 9px;
   height: 9px;
-  border: 1.5px solid #f6e2a0;
+  border: 1.5px solid var(--demo-lift);
   border-radius: 1px;
   background: rgb(240 208 120 / 85%);
   box-shadow: 0 0 0 2px rgb(12 28 42 / 55%);
@@ -630,12 +536,12 @@ function resetPointer() {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .04em;
-  text-shadow: 0 1px 2px #06131d;
+  text-shadow: 0 1px 2px var(--demo-canvas);
 }
-.key-tick.active { color: #fff4c8; }
+.key-tick.active { color: var(--demo-ink); }
 .key-tick.active > i {
-  background: #f0d078;
-  border-color: #fff;
+  background: var(--demo-lift);
+  border-color: var(--demo-ink);
   box-shadow: 0 0 0 3px rgb(240 208 120 / 35%), 0 0 12px rgb(240 208 120 / 55%);
 }
 .key-tick.active span { background: rgb(120 88 18 / 82%); }
@@ -666,10 +572,10 @@ function resetPointer() {
   transition: stroke .25s ease, stroke-width .25s ease, opacity .25s ease;
 }
 .guide.active {
-  stroke: #4fc2ff;
+  stroke: var(--demo-accent);
   stroke-width: 4;
   stroke-dasharray: none;
-  filter: drop-shadow(0 0 6px #168ee8) drop-shadow(0 0 12px rgb(43 165 255 / 72%));
+  filter: drop-shadow(0 0 6px var(--demo-accent)) drop-shadow(0 0 12px color-mix(in srgb, var(--demo-accent) 72%, transparent));
 }
 .guide-halo.active { stroke: rgb(5 27 44 / 90%); stroke-width: 8; }
 .key-halo,
@@ -681,14 +587,14 @@ function resetPointer() {
   opacity: .55;
 }
 .key-guide {
-  stroke: #e8b84a;
+  stroke: var(--demo-lift);
   stroke-width: 2.2;
   stroke-dasharray: 14 7;
   stroke-linecap: round;
   filter: drop-shadow(0 1px 2px rgb(0 12 25 / 90%));
   transition: stroke .25s ease, stroke-width .25s ease, opacity .25s ease;
 }
-.key-guide.treeline { stroke: #9fd07a; }
+.key-guide.treeline { stroke: var(--demo-vegetation); }
 .key-guide.active {
   stroke-width: 3.4;
   stroke-dasharray: 10 5;
@@ -697,10 +603,10 @@ function resetPointer() {
 .key-guide.treeline.active { filter: drop-shadow(0 0 6px rgb(140 200 90 / 70%)); }
 .key-halo.active { stroke: rgb(22 28 10 / 88%); stroke-width: 8; opacity: .9; }
 .focus {
-  fill: #258fe7;
-  stroke: white;
+  fill: var(--demo-accent);
+  stroke: var(--demo-ink);
   stroke-width: 4;
-  filter: drop-shadow(0 0 9px #2aa5ff);
+  filter: drop-shadow(0 0 9px var(--demo-accent));
 }
 .focus-pulse {
   fill: rgb(63 182 255 / 18%);
@@ -723,7 +629,7 @@ function resetPointer() {
   color: var(--knowledge-data);
   text-align: left;
   background: rgb(19 45 68 / 66%);
-  text-shadow: 0 1px 3px #06131d;
+  text-shadow: 0 1px 3px var(--demo-canvas);
   box-shadow: 0 3px 12px rgb(0 0 0 / 16%);
   transform: translate3d(calc(var(--look-x) * -.3), calc(var(--look-y) * -.24), 0);
   transition: transform .22s cubic-bezier(.2,.75,.2,1), background .2s ease, box-shadow .2s ease;
@@ -735,8 +641,8 @@ function resetPointer() {
 .zone-label span { font-size: 11px; }
 .zone-label { cursor: pointer; }
 .zone-label.selected {
-  color: #fff;
-  background: rgb(20 112 181 / 90%);
+  color: var(--demo-ink);
+  background: color-mix(in srgb, var(--demo-accent) 90%, var(--demo-panel));
   box-shadow: 0 0 0 1px rgb(136 218 255 / 72%), 0 5px 20px rgb(13 106 176 / 52%);
 }
 .key-label {
@@ -747,25 +653,26 @@ function resetPointer() {
   padding: 4px 8px;
   border: 1px solid rgb(240 208 120 / 42%);
   border-radius: 5px;
-  color: #f6e7b0;
+  color: var(--demo-lift);
   text-align: left;
   background: rgb(32 40 18 / 72%);
-  text-shadow: 0 1px 3px #06131d;
+  text-shadow: 0 1px 3px var(--demo-canvas);
   box-shadow: 0 3px 12px rgb(0 0 0 / 18%);
   cursor: pointer;
+  max-width: min(142px, calc(100% - 20px));
   transform: translate3d(calc(var(--look-x) * -.3), calc(var(--look-y) * -.24), 0);
   transition: transform .22s cubic-bezier(.2,.75,.2,1), background .2s ease, box-shadow .2s ease, border-color .2s ease;
   will-change: transform;
 }
 .key-label.treeline {
   border-color: rgb(159 208 122 / 45%);
-  color: #d7efb8;
+  color: var(--demo-vegetation);
   background: rgb(18 36 20 / 74%);
 }
 .key-label b { font-size: 11px; letter-spacing: .06em; }
 .key-label span { color: rgb(255 255 255 / 78%); font-size: 10px; }
 .key-label.selected {
-  color: #fff8dc;
+  color: var(--demo-ink);
   background: rgb(120 88 18 / 88%);
   border-color: rgb(255 224 140 / 78%);
   box-shadow: 0 0 0 1px rgb(240 208 120 / 55%), 0 5px 18px rgb(90 70 10 / 45%);
@@ -801,7 +708,7 @@ function resetPointer() {
 }
 .key-note b {
   flex: none;
-  color: #f0d078;
+  color: var(--demo-lift);
   font-size: 11px;
   letter-spacing: .04em;
 }
@@ -820,29 +727,33 @@ function resetPointer() {
 .description { min-height: 44px; margin: 10px 0; color: var(--knowledge-body); font-size: 11px; line-height: 1.75; }
 .detail-tabs { display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; border-radius: 7px; background: rgb(3 16 28 / 40%); }
 .detail-tabs button { padding: 7px 2px; border: 0; color: var(--knowledge-muted); background: transparent; font-size: 10px; cursor: pointer; }
-.detail-tabs button.active { color: var(--knowledge-data); background: linear-gradient(180deg, #4ca9eb, #2e7fba); }
+.detail-tabs button.active { color: var(--knowledge-data); background: linear-gradient(180deg, var(--demo-cold-soft), var(--demo-accent)); }
 .facts { display: grid; gap: 9px; margin-top: 12px; }
 .facts p { display: grid; grid-template-columns: 32px 1fr; margin: 0; }
-.facts i { grid-row: span 2; align-self: center; color: #f4fbff; font-size: 22px; font-style: normal; }
+.facts i { grid-row: span 2; align-self: center; color: var(--demo-ink); font-size: 22px; font-style: normal; }
 .facts span { color: var(--knowledge-muted); font-size: 10px; }
 .facts b { margin-top: 2px; color: var(--knowledge-data); font-size: 13px; font-weight: 500; }
 .specimen-grid { display: grid; gap: 8px; margin-top: 11px; }
 .specimen {
   position: relative;
   display: grid;
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 112px 1fr;
   align-items: center;
-  min-height: 58px;
+  min-height: 112px;
   overflow: hidden;
   border: 1px solid rgb(142 207 246 / 20%);
   border-radius: 9px;
+  padding: 0;
   background: linear-gradient(110deg, rgb(27 78 98 / 52%), rgb(8 30 48 / 48%));
+  color: inherit;
+  text-align: left;
+  cursor: zoom-in;
   animation: specimen-breathe 3.8s ease-in-out infinite alternate;
 }
 .specimen:nth-child(2) { animation-delay: -1.9s; }
 .specimen-image {
   align-self: stretch;
-  min-height: 58px;
+  min-height: 112px;
   background-position: center;
   background-size: cover;
   filter: saturate(.9) contrast(1.06);
@@ -850,86 +761,39 @@ function resetPointer() {
   transition: transform .45s ease, filter .45s ease;
 }
 .specimen:hover .specimen-image { filter: saturate(1.1) contrast(1.08); transform: scale(1.13); }
-.specimen-icon {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  margin-left: 8px;
-  border: 1px solid rgb(157 220 255 / 28%);
-  border-radius: 50%;
-  color: #eaf8ff;
-  background: radial-gradient(circle at 35% 28%, rgb(82 183 236 / 58%), rgb(18 66 94 / 65%));
-  font-size: 25px;
-  font-style: normal;
-  filter: drop-shadow(0 4px 8px rgb(0 9 18 / 36%));
-  animation: specimen-float 2.8s ease-in-out infinite alternate;
-}
-.specimen:nth-child(2) .specimen-icon { animation-delay: -1.4s; }
 .specimen > span { display: grid; gap: 3px; padding: 8px 9px; }
 .specimen b { color: var(--knowledge-data); font-size: 12px; }
 .specimen small { color: var(--knowledge-muted); font-size: 9px; line-height: 1.45; }
-.specimen.animal { background: linear-gradient(110deg, rgb(70 60 35 / 42%), rgb(8 30 48 / 48%)); }
-.animal-explorer { display: grid; gap: 8px; margin-top: 10px; }
-.animal-film { margin: 0; }
-.animal-film video {
-  display: block;
-  width: 100%;
-  max-height: 220px;
-  object-fit: contain;
-  border-radius: 8px;
-  background: #07131c;
-}
-.animal-film video::-webkit-media-controls,
-.animal-film video::-webkit-media-controls-enclosure {
-  display: none !important;
-}
-.animal-film figcaption,
-.animal-missing {
-  margin-top: 4px;
-  color: var(--knowledge-muted);
-  font-size: 9px;
-  line-height: 1.45;
-}
-.animal-missing { margin: 0; }
-.animal-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.animal-switch button {
-  display: grid;
-  grid-template-columns: 31px minmax(0, 1fr);
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  padding: 5px;
-  border: 1px solid rgb(138 205 239 / 18%);
-  border-radius: 8px;
-  color: var(--knowledge-body);
-  text-align: left;
-  background: rgb(7 27 43 / 62%);
-  cursor: pointer;
-}
-.animal-switch button.active {
-  border-color: rgb(99 199 255 / 68%);
-  color: #fff;
-  background: linear-gradient(135deg, rgb(36 126 177 / 74%), rgb(13 56 84 / 78%));
-  box-shadow: 0 0 14px rgb(48 164 222 / 18%);
-}
-.animal-switch i { font-size: 21px; font-style: normal; text-align: center; }
-.animal-switch span { display: grid; min-width: 0; gap: 2px; }
-.animal-switch b { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.animal-switch small {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--knowledge-muted);
-  font-size: 8px;
-  line-height: 1.25;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
 @keyframes specimen-breathe { to { border-color: rgb(116 208 255 / 40%); box-shadow: inset 0 0 18px rgb(57 164 217 / 8%); } }
-@keyframes specimen-float { to { transform: translateY(-3px) rotate(1.5deg); } }
+.specimen-preview {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 10 18 / 72%);
+  backdrop-filter: blur(5px);
+}
+.specimen-preview figure {
+  position: relative;
+  width: min(760px, 92vw);
+  max-height: 90%;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid rgb(203 232 250 / 42%);
+  border-radius: 12px;
+  background: var(--demo-panel);
+  box-shadow: 0 22px 55px rgb(0 0 0 / 55%);
+}
+.specimen-preview figure > button { position: absolute; z-index: 1; top: 8px; right: 8px; width: 32px; height: 32px; border: 0; border-radius: 50%; color: white; background: rgb(0 12 22 / 72%); font-size: 24px; cursor: pointer; }
+.specimen-preview img { display: block; width: 100%; max-height: 65vh; object-fit: contain; background: var(--demo-canvas); }
+.specimen-preview figcaption { display: grid; gap: 4px; padding: 12px 16px; color: var(--knowledge-body); font-size: 12px; line-height: 1.5; }
+.specimen-preview figcaption b { color: var(--knowledge-title); font-size: 15px; }
+.specimen-preview figcaption a { color: var(--demo-accent-soft); font-size: 10px; }
 .tab-copy { min-height: 82px; margin: 14px 0 0; color: var(--knowledge-body); font-size: 12px; line-height: 1.8; }
 .reopen { position: absolute; z-index: 6; top: 18px; right: 18px; padding: 9px 12px; border-radius: 10px; color: white; cursor: pointer; }
-.cinematic-note { position: absolute; right: 16px; bottom: 12px; z-index: 4; color: rgb(224 241 251 / 72%); font-size: 9px; text-shadow: 0 1px 4px #07131c; }
+.cinematic-note { position: absolute; right: 16px; bottom: 12px; z-index: 4; max-width: 50%; color: var(--demo-ink-muted); font-size: 9px; text-align: right; text-shadow: 0 1px 4px var(--demo-canvas); }
 @media (max-width: 980px) {
   .detail { width: 280px; }
   .elevation { width: 175px; }
@@ -943,6 +807,6 @@ function resetPointer() {
   .cinematic-note { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .plate, .cloud, .mountain-guides, .zone-label, .key-label, .focus-pulse, .specimen, .specimen-icon { transition: none; animation: none; }
+  .plate, .cloud, .mountain-guides, .zone-label, .key-label, .focus-pulse, .specimen { transition: none; animation: none; }
 }
 </style>

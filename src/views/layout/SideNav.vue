@@ -131,6 +131,15 @@ function toggleCollapsed() {
         <span v-else>{{ g.label.replace('高', '') }}</span>
       </button>
     </div>
+    <button
+      type="button"
+      class="leaderboard-entry"
+      :class="{ on: route.name === 'leaderboard' }"
+      title="珠峰攀登榜"
+      @click="router.push({ name: 'leaderboard' })"
+    >
+      <span>▲</span><em v-if="!collapsed">珠峰攀登榜</em>
+    </button>
     <div v-show="!collapsed" class="books">
       <section v-for="book in activeGrade.books" :key="book.id" class="book">
         <button type="button" class="book-hd" @click="toggleBook(book.id)">
@@ -261,6 +270,23 @@ function toggleCollapsed() {
   gap: 4px;
   padding: 8px 8px 0;
 }
+.leaderboard-entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 9px 8px 4px;
+  padding: 8px 9px;
+  border: 1px solid rgba(232, 184, 74, 0.35);
+  border-radius: 9px;
+  background: rgba(232, 184, 74, 0.08);
+  color: #f0cf78;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.leaderboard-entry:hover,.leaderboard-entry.on { background: rgba(232, 184, 74, 0.17); }
+.leaderboard-entry em { font-style: normal; }
+.collapsed .leaderboard-entry { justify-content: center; margin: 9px 9px 4px; padding: 9px 0; }
 .collapsed .grades {
   grid-template-columns: 1fr;
   gap: 7px;

@@ -33,7 +33,6 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 | 场景 | 选型 |
 |------|------|
 | 3D 地球、气压带、洋流、ENSO/沃克环流、直射点等 | Three.js + `three-globe`（`GlobeHost` + 可插拔图层） |
-| 全球飞行、真实区域地形、经纬度与海拔查询 | CesiumJS（Apache-2.0；离线 Workers / Assets 与本地地形，禁止依赖 Cesium ion 或运行时地形服务） |
 | 过程时间线 / 锋面剖面 / 火山成岩等微场景 | Three.js 自建场景（可 OrbitControls） |
 | 银河系棒旋示意点云 | `threejs-galaxy-shader`（MIT；嵌入现有 scene/composer，叠教学标注） |
 | 循环图式、类型卡片、地带谱等 2D 示意 | D3 / 手写 SVG |
@@ -100,6 +99,7 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | `rocks/disclaimer.json` | 岩石贴图声明 | 标明 CC0 与「非岩性鉴定」 |
 | `weather/ground-color.jpg` | 锋面/气旋地面 | ambientCG **Ground037**，**CC0** |
 | `weather/cloud-soft.png` | 锋面云层 | 教学用软云（程序生成） |
+| `weather/cloud-realistic.png` | 大气受热过程的云层 | 写实教学云，透明底；见 `weather/disclaimer.json` |
 | `weather/disclaimer.json` | 天气贴图声明 | 非预报依据 |
 
 | `landcover/aerial-grass.jpg` | 俯视草地 | Poly Haven **aerial_grass_rock**，**CC0** |
@@ -152,13 +152,7 @@ SRTM）；影像为 CC BY 4.0。`metadata.json` 记录范围、5895 m 峰顶高�
 `python3 scripts/build-kilimanjaro-terrain.py` 可重建；需要 Python 3、
 NumPy 与 Pillow，缓存位于 `.cache/kilimanjaro-terrain/`。
 
-垂直带的动物实拍放在 `public/videos/animals/`，从维基共享资源原片截取并压成无声课堂 WebM，署名见同目录 `disclaimer.json`。界面不放播放控件，静音循环自动播放。已打包的有：印度斯皮提野生雪豹红外相机（Rishi Sharma，CC BY 3.0）、阿尔卑斯羱羊（Tobias Gasser，CC BY-SA 2.5，与岩羊同为羊亚科）、落基山北美鼠兔（mark byzewski，CC BY 2.0，与高原鼠兔同属）、阿尔卑斯旱獭取食（Marcel Zurreck，CC BY 4.0，与喜马拉雅旱獭同属）、喜马拉雅兀鹫（Alahamali70，CC BY-SA 4.0，地点为科威特）、欧亚红松鼠取食（Roberto Verzo，CC BY 3.0）、红腹锦鸡（Andrew Simone，CC BY 2.0，画面有笼网）、北海道虾夷梅花鹿（Nesnad，CC BY 4.0，梅花鹿亚种）、横滨画眉（ContributorQ，CC BY 3.0）。林麝、藏原羚和适合林地带的猕猴，共享资源里没有可用的短片。
-
-`src/demos/env-differentiation/CesiumTerrain.vue` 只使用已打包资源：把
-`height-u16.bin` 转成 `CustomHeightmapTerrainProvider`，全球底图用仓库内 NASA
-Blue Marble，山体范围叠加 `ortho.jpg`。运行时不请求 Cesium ion、全球地形瓦片或
-在线影像。Vite 通过 `vite-plugin-static-copy` 将 Cesium 的 Workers、Assets、
-Widgets 与 ThirdParty 文件复制到 `/cesium/`，打包后可离线运行。
+垂直自然带使用本地静态教学图 `public/images/env-differentiation/alpine-2_5d-hero-4k.webp`，叠加可点选的海拔、自然带和要素说明；典型植被与动物卡片使用本地真实静态图片，来源与许可见 `public/images/biomes/SOURCES.md`、`public/images/animals/SOURCES.md`。不打包或播放视频素材。
 
 ### 3.3 联网服务（可选层，失败须可降级）
 
@@ -247,7 +241,7 @@ src-tauri/               桌面壳
 4. **贴图**：需要质感时用 ambientCG 等 CC0，放 `public/textures/...`，写 `disclaimer.json`；UI 角标注明「示意 · 非鉴定」。
 5. **勿**用干巴静态框图或仅虚线滚动冒充过程。
 
-样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时与日界线，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。必修第一册「地球的圈层结构」：课步「内部圈层」为 Three 斜视切角（右前上方挖掉互成直角的一角，同时看见切面与 Blue Marble 球面）。切面质感复用已打包的 ambientCG CC0：地壳 `strata-color`（土色沉积岩）、岩石圈 `igneous-color`（岩浆岩）、软流层为受热岩石、地幔 `lava-color`（熔岩）；外核与内核用铁镍熔融色，不跟岩浆同一套橙。壳与软流层厚度已夸张。「外部圈层」单独用 SVG。其余各课（太阳影响、演化、地貌、大气、水、植被与土壤）为带动画箭头的 SVG 过程示意，共用 `src/demos/bx1/SceneFrame.vue`。凡画地球圆盘用 `EarthDisc` 裁切 `earth-blue-marble.jpg`，禁止纯色圆代替地表。「地域差异性」课步「垂直地带性」采用摄影式 2.5D 教学场景：全景、山体近景、山谷视角使用 `vertical-alpine-*` 三张同一虚构山系生成图，叠加可交互海拔标注、自然带说明与循环水汽抬升箭头；缩放只做有限景深推进，不模拟任意角度测绘旋转。课堂示意，非实拍、非实测地形，也不是卫星正射图。
+样板代码：`src/demos/rock-cycle/index.vue`（成岩过程）、`src/demos/landform-change/index.vue`（褶皱/断层内力）、`src/demos/weather-systems/index.vue`（锋面）、`src/demos/earth-rotation/index.vue`（自转：方向·周期·速度 / 昼夜晨昏 / 地转偏向 / 时区区时与日界线，对照选必1·1.1 PPT）、`src/demos/universe-earth/index.vue`（必修1·地球的宇宙环境：太阳系全天银道+BSC5；课步「银河系」为多层合成——NASA 俯视盘 + `galaxyNebula` 星云气体 + `threejs-galaxy-shader` 点云 + 盘面/晕星 + Bloom，标注来自 `milky-way-arms-teach.json`，`npm run build:stars` / `build:galaxy`）。必修第一册「地球的圈层结构」：课步「内部圈层」为 Three 斜视切角（右前上方挖掉互成直角的一角，同时看见切面与 Blue Marble 球面）。切面质感复用已打包的 ambientCG CC0：地壳 `strata-color`（土色沉积岩）、岩石圈 `igneous-color`（岩浆岩）、软流层为受热岩石、地幔 `lava-color`（熔岩）；外核与内核用铁镍熔融色，不跟岩浆同一套橙。壳与软流层厚度已夸张。「外部圈层」单独用 SVG。大气受热过程（`atmosphere-heating`）为临边三维场景：真实地表、厚度已放大的对流层/平流层气块，短波削弱、地面长波与大气逆辐射均用实心箭头。其余各课（太阳影响、演化、地貌、大气分层与热力环流、水、植被与土壤）为带动画箭头的 SVG 过程示意，共用 `src/demos/bx1/SceneFrame.vue`。凡画地球圆盘用 `EarthDisc` 裁切 `earth-blue-marble.jpg`，禁止纯色圆代替地表。「地域差异性」分为纬度地带性、干湿度地带性、垂直地域分异和地方性分异四个课步；垂直课步使用 `alpine-2_5d-hero-4k.webp` 虚构山系教学图，叠加可交互海拔、林线、雪线和自然带说明。地方性课步使用 `public/terrain/gongga/` 的贡嘎山—海螺沟真实高程与 EOxCloudless/Sentinel-2 影像生成 Three.js 地形，坡向、冷空气、岩层和汇流为教学叠加，不能标作实测机制数据。界面必须分别标明真实数据来源与教学示意边界。
 
 ---
 
@@ -273,6 +267,7 @@ src-tauri/               桌面壳
 - CSS：`src/styles/global.css` 的 `--demo-*`、壳层「星空」夜空底（与地球场景 `#070b16` 同一套）。
 - 画布字号宜小（角标约 10px，要素名 10～12px）。
 - **地球示意线**：`DemoHex.earth*` / `EarthLineWidth` / `EarthLineStroke`（实线 vs 虚线）/ `EarthDashDeg`。口诀：**主框架实线，特殊纬线虚线**（回归线、极圈虚线；赤道/经纬网/晨昏实线）。Three 用 Tube/Torus；虚线分段 Tube。样板：`earth-rotation` 晨昏、`layers/latlon.ts`。
+- **视觉完成度门槛**：详见 `.cursor/rules/demo-lab.mdc`。同一教程以完成度最高的相邻课步为最低基线；必须完成地理场景载体、知识—图形绑定、有效构图、交互反馈和桌面/窄屏截图横向验收，禁止用统一配色掩盖 PPT 基础图形或占位构图。
 
 ---
 

@@ -365,13 +365,14 @@ function disposeObj(obj: THREE.Object3D) {
 
 function buildEarth() {
   if (!scene || !renderer) return
+  const activeRenderer = renderer
   earth = new THREE.Group()
   scene.add(earth)
 
   const loader = new THREE.TextureLoader()
   const marble = loader.load('/textures/earth-blue-marble.jpg')
   marble.colorSpace = THREE.SRGBColorSpace
-  marble.anisotropy = renderer.capabilities.getMaxAnisotropy()
+  marble.anisotropy = activeRenderer.capabilities.getMaxAnisotropy()
   marble.wrapS = THREE.RepeatWrapping
   marble.offset.x = 0.58
 
@@ -391,7 +392,7 @@ function buildEarth() {
     tex.colorSpace = THREE.SRGBColorSpace
     tex.wrapS = THREE.RepeatWrapping
     tex.wrapT = THREE.RepeatWrapping
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy()
+    tex.anisotropy = activeRenderer.capabilities.getMaxAnisotropy()
     return tex
   }
   // ambientCG CC0：土色沉积岩、岩浆岩、熔岩。地核无实拍，用铁镍熔融色。
@@ -409,7 +410,7 @@ function buildEarth() {
   ]
 
   const makeMats = (darken: number) =>
-    BANDS.map((band, i) => {
+    BANDS.map((_, i) => {
       const look = bandLooks[i]!
       return new THREE.MeshBasicMaterial({
         map: look.map,
