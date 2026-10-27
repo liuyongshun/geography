@@ -159,12 +159,13 @@ Compress-Archive -Path '${staging.replace(/'/g, "''")}\\*' -DestinationPath '${o
     console.error('Compress-Archive 失败，尝试 tar…')
   }
 
-  // macOS: ditto 生成可被资源管理器打开的 zip
+  // macOS: 明确设置中文路径的 UTF-8 标记，避免资源管理器显示乱码。
   if (process.platform === 'darwin') {
-    const ditto = spawnSync('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', staging, outZip], {
+    const zip = spawnSync('python3', [path.join(__dirname, 'zip-windows-portable.py'), staging, outZip], {
       stdio: 'inherit',
     })
-    if (ditto.status === 0) return true
+    if (zip.status === 0) return true
+    return false
   }
 
   // 通用兜底：bsdtar / GNU tar 的 zip 后端
