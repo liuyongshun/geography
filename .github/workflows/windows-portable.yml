@@ -1,0 +1,50 @@
+name: Windows Portable
+
+# 绿色版（免安装 zip）：可手动触发，或推送 portable-* 标签
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'portable-*'
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-portable:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build Windows portable zip
+        shell: bash
+        run: npm run build:portable
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dili-windows-portable
+          path: dist-portable/*-windows-portable.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-portable/*-windows-portable.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

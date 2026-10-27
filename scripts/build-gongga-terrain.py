@@ -103,7 +103,7 @@ def build_height() -> tuple[float, float]:
     (OUT / "height-u16.bin").write_bytes(quantized.tobytes())
 
     preview = Image.fromarray(quantized_values.astype(np.uint16))
-    preview.save(OUT / "height-preview.png", optimize=True)
+    preview.convert("RGB").save(OUT / "height-preview.jpg", quality=90, optimize=True)
     return minimum, maximum
 
 

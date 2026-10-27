@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>岩浆 · 动态地质剖面</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07101c;color:#e6eef7;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1400px;margin:auto;padding:26px 32px 24px}header{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:20px}.eyebrow{color:#79abc6;font-size:11px;letter-spacing:3px;margin-bottom:9px}h1{font-size:26px;font-weight:600;letter-spacing:2px;margin:0}header p{color:#8899ad;font-size:13px;margin:0 0 4px}.live{display:inline-block;width:6px;height:6px;background:#ffa257;border-radius:50%;margin-right:8px}.stage{position:relative;aspect-ratio:3/2;max-height:calc(100vh - 218px);margin:auto;overflow:hidden;background:#0b192b;border:1px solid #233042;border-radius:10px}.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}.stage img{object-fit:fill}#sparks{pointer-events:none}.tag{position:absolute;pointer-events:none;display:flex;align-items:center;gap:9px;font-size:12px;color:#eaf1f8;text-shadow:0 1px 4px #000}.tag:before{content:"";width:5px;height:5px;border:1px solid #ffb774;border-radius:50%;background:#f7a05b}.tag span{background:#091422c9;padding:6px 10px;border:1px solid #ffffff18;border-radius:5px}.tag.chamber{left:17%;top:76%}.tag.conduit{left:46%;top:49%}.tag.surface{left:70%;top:33%}.tag small{display:block;color:#b5c4d1;font-size:10px;margin-top:3px;letter-spacing:.5px}.stage.hide-labels .tag{display:none}.status{position:absolute;top:18px;left:18px;font-size:10px;letter-spacing:2px;color:#a8c5dc;background:#07132299;border:1px solid #fff1;border-radius:20px;padding:7px 11px}.controls{display:flex;align-items:center;justify-content:space-between;gap:22px;padding-top:18px;font-size:12px}.group{display:flex;align-items:center;gap:14px}button{font:inherit;color:#d8e7f5;background:#122439;border:1px solid #30475e;border-radius:6px;padding:9px 17px;cursor:pointer}button:hover{background:#20374b}button:focus-visible,input:focus-visible{outline:2px solid #8ecae7;outline-offset:4px}label{display:flex;align-items:center;gap:10px;color:#9badbf}input[type=range]{accent-color:#f69b57;width:120px}input[type=checkbox]{accent-color:#f69b57}output{color:#e5b38c;min-width:33px;font-variant-numeric:tabular-nums}.caption{margin-top:16px;padding-top:14px;border-top:1px solid #1d2a39;color:#8499ae;font-size:12px;line-height:1.8;display:flex;justify-content:space-between;gap:20px}.caption strong{color:#c8d7e6;font-weight:500}.error{position:absolute;bottom:15px;left:15px;right:15px;color:#ffe1be;font-size:12px;background:#1e1c20;padding:10px;border-radius:5px}@media(max-width:700px){main{padding:18px 12px}header{align-items:start}header p{display:none}h1{font-size:22px}.stage{max-height:none}.controls{flex-wrap:wrap;gap:14px}.group{gap:10px}button{padding:8px 12px}.tag{font-size:10px}.tag small{display:none}.caption{display:block}.caption span{display:block}.status{top:10px;left:10px;font-size:8px}}
+</style>
+</head>
+<body><main>
+<header><div><div class="eyebrow">地理 · 动态知识图 / 01</div><h1>岩浆，从地底到地表</h1></div><p><span class="live"></span>实时动画预览</p></header>
+<div class="stage" id="stage">
+<img src="/textures/geology/volcano-cutaway.jpg" alt="火山地质剖面：地下岩浆房通过上升通道与地表火山口相连">
+<canvas id="scene" aria-label="岩浆翻涌、沿通道上升与地表熔岩流动动画"></canvas><canvas id="sparks" aria-hidden="true"></canvas>
+<div class="status" id="status">MAGMA / 正在演示</div>
+<div class="tag chamber"><span>岩浆房<small>地下翻涌</small></span></div>
+<div class="tag conduit"><span>上升通道<small>岩浆向上运移</small></span></div>
+<div class="tag surface"><span>地表熔岩<small>沿坡流动 · 逐渐冷却</small></span></div>
+</div>
+<div class="controls"><div class="group"><button id="play" type="button" aria-pressed="true">暂停动画</button><button id="reset" type="button">重新播放</button></div><div class="group"><label for="speed">流动速度 <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1"><output id="speed-value">1×</output></label><label><input type="checkbox" id="labels" checked>显示标注</label></div></div>
+<div class="caption"><span><strong>地下是岩浆，喷出地表后称为熔岩。</strong> 观察岩浆房、上升通道与地表熔岩之间的联系。</span><span>视觉效果样片 · 运动速度与空间尺度经过示意化处理</span></div>
+</main>
+<script>
+const stage=document.getElementById('stage'),canvas=document.getElementById('scene'),sparks=document.getElementById('sparks'),ctx=sparks.getContext('2d');
+let gl=null,playing=!matchMedia('(prefers-reduced-motion: reduce)').matches,speed=1,time=0,last=0,frame=0,visible=true;
+const vs=`attribute vec2 position;varying vec2 uv;void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}`;
+const fs=`precision highp float;
+uniform sampler2D art;uniform float time;uniform vec2 resolution;varying vec2 uv;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
+float fbm(vec2 p){float v=0.;float a=.5;for(int i=0;i<4;i++){v+=a*noise(p);p=p*2.03+7.1;a*=.5;}return v;}
+vec3 tex(vec2 p){return texture2D(art,vec2(p.x,1.-p.y)).rgb;}
+float hot(vec3 c){return smoothstep(.43,.83,c.r)*smoothstep(.06,.23,c.r-c.g*.75-c.b*.5)*(1.-smoothstep(.25,.58,c.b));}
+void main(){
+vec2 p=vec2(uv.x,1.-uv.y);vec3 base=tex(p);float mask=hot(base);
+float chamber=(1.-smoothstep(.77,1.05,length((p-vec2(.416,.755))/vec2(.239,.17))))*smoothstep(.58,.64,p.y);
+float conduit=(1.-smoothstep(.009,.024,abs(p.x-.417)))*smoothstep(.16,.22,p.y)*(1.-smoothstep(.61,.67,p.y));
+float surface=(1.-smoothstep(.028,.07,abs(p.y-(.192+(p.x-.428)*.50))))*smoothstep(.425,.46,p.x)*(1.-smoothstep(.81,.86,p.x));
+vec2 q=(p-vec2(.416,.755))/vec2(.239,.17);
+vec2 swirl=vec2(-q.y,q.x)*.017;swirl+=vec2(sin(q.y*7.+time*.5),cos(q.x*8.-time*.6))*.009;
+vec2 velocity=mix(vec2(.003,-.006),swirl,chamber);velocity=mix(velocity,vec2(0.,-.037),conduit);velocity=mix(velocity,vec2(.027,.014),surface);
+float phase=fract(time*.22),phase2=fract(time*.22+.5);float blend=abs(phase*2.-1.);
+vec2 turbulence=vec2(fbm(p*28.+vec2(0.,time*.26)),fbm(p*31.-vec2(time*.19,0.)))-.5;
+vec2 d1=-velocity*phase*3.+turbulence*.008;vec2 d2=-velocity*phase2*3.+turbulence*.008;
+vec3 a=tex(p+d1),b=tex(p+d2);vec3 flowed=mix(a,b,blend);
+float region=max(mask,max(chamber*.89,conduit*.7));region*=smoothstep(.12,.35,base.r);
+// The same flow field advects both the bright melt and the dark crust plates.
+vec3 col=mix(base,flowed,region*.88);
+vec2 field=p*vec2(82.,66.)-velocity*time*80.;float n=fbm(field+vec2(fbm(field*.55+time*.12)*3.));
+float threads=pow(1.-abs(n*2.-1.),10.);
+float molten=hot(col);vec3 gold=vec3(1.,.36+.41*threads,.025+.11*threads);
+float pulse=.92+.08*sin(time*1.3+p.y*13.)+.045*sin(time*3.4+p.x*21.);
+col=mix(col,gold,region*molten*(.14+.24*threads));col*=1.+mask*(pulse-1.);
+// Narrow traveling highlights show the upward flow in the conduit.
+float rising=pow(.5+.5*sin(p.y*95.+time*6.5),8.);col+=vec3(.15,.075,.008)*conduit*mask*rising;
+float glow=0.;vec2 px=1./resolution;glow+=hot(tex(p+vec2(5.,0.)*px));glow+=hot(tex(p-vec2(5.,0.)*px));glow+=hot(tex(p+vec2(0.,5.)*px));glow+=hot(tex(p-vec2(0.,5.)*px));
+col+=vec3(.042,.012,.001)*glow*(.76+.24*sin(time*1.6+p.x*11.));
+gl_FragColor=vec4(col,1.);
+}`;
+let program,uTime,uRes;
+function compile(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+function resize(){const r=stage.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,1.75);canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);sparks.width=canvas.width;sparks.height=canvas.height;if(gl){gl.viewport(0,0,canvas.width,canvas.height);gl.uniform2f(uRes,canvas.width,canvas.height);}}
+const particles=Array.from({length:65},(_,i)=>({phase:(i*.61803398875)%1,life:1.1+(i%8)*.17,vx:Math.sin(i*12.7)*.025,vy:-.055-(i%9)*.004,size:.6+(i%4)*.35}));
+function drawSparks(){const w=sparks.width,h=sparks.height;ctx.clearRect(0,0,w,h);ctx.globalCompositeOperation='lighter';for(const s of particles){const age=((time+s.phase*s.life)%s.life);const x=(.417+s.vx*age)*w,y=(.178+s.vy*age+.045*age*age)*h;const opacity=Math.max(0,1-age/s.life);const radius=s.size*w/1100;ctx.beginPath();ctx.strokeStyle='rgba(255,123,26,'+opacity*.7+')';ctx.lineWidth=radius;ctx.moveTo(x-s.vx*w*.025,y-(s.vy+.09*age)*h*.025);ctx.lineTo(x,y);ctx.stroke();ctx.fillStyle='rgba(255,208,103,'+opacity+')';ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();}ctx.globalCompositeOperation='source-over';}
+function render(){gl.uniform1f(uTime,time);gl.drawArrays(gl.TRIANGLES,0,6);drawSparks();}
+function tick(now){frame=requestAnimationFrame(tick);const dt=last?Math.min((now-last)/1000,.05):0;last=now;if(playing&&visible){time+=dt*speed;render();}}
+function updatePlay(){document.getElementById('play').textContent=playing?'暂停动画':'播放动画';document.getElementById('play').setAttribute('aria-pressed',String(playing));document.getElementById('status').textContent=playing?'MAGMA / 正在演示':'MAGMA / 已暂停';}
+document.getElementById('play').onclick=()=>{playing=!playing;updatePlay();};
+document.getElementById('reset').onclick=()=>{time=0;playing=true;updatePlay();if(gl)render();};
+document.getElementById('speed').oninput=e=>{speed=Number(e.target.value);document.getElementById('speed-value').value=speed+'×';};
+document.getElementById('labels').onchange=e=>stage.classList.toggle('hide-labels',!e.target.checked);
+document.addEventListener('visibilitychange',()=>{visible=!document.hidden;last=0;});
+window.addEventListener('pagehide',()=>cancelAnimationFrame(frame));
+const observer=new ResizeObserver(()=>{if(gl&&program){resize();render();}});observer.observe(stage);
+const img=new Image();img.onload=()=>{try{gl=canvas.getContext('webgl',{alpha:false,antialias:false,preserveDrawingBuffer:true});if(!gl)throw Error('WebGL unavailable');program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vs));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const pos=gl.getAttribLocation(program,'position');gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);const texture=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,img);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.uniform1i(gl.getUniformLocation(program,'art'),0);uTime=gl.getUniformLocation(program,'time');uRes=gl.getUniformLocation(program,'resolution');resize();render();updatePlay();requestAnimationFrame(tick);}catch(error){console.error(error);canvas.style.display='none';playing=false;updatePlay();document.getElementById('play').disabled=true;document.getElementById('reset').disabled=true;const message=document.createElement('div');message.className='error';message.textContent='当前设备未能启动图形加速，正在显示静态底图。';stage.append(message);}};img.onerror=()=>{const message=document.createElement('div');message.className='error';message.textContent='底图加载失败，请刷新页面重试。';stage.append(message);};img.src='/textures/geology/volcano-cutaway.jpg';
+</script></body></html>

@@ -113,7 +113,7 @@ export const DEMO_REGISTRY: DemoEntry[] = [
     tutorialId: 'atmosphere-layers',
     title: '大气组成与分层',
     status: 'ready',
-    engine: 'd3',
+    engine: 'three',
     steps: [
       { id: 'compose', title: '组成' },
       { id: 'layers', title: '垂直分层' },
@@ -137,7 +137,7 @@ export const DEMO_REGISTRY: DemoEntry[] = [
     tutorialId: 'thermal-circulation',
     title: '大气热力环流',
     status: 'ready',
-    engine: 'd3',
+    engine: 'three',
     steps: [
       { id: 'cell', title: '热力环流' },
       { id: 'breeze', title: '海陆风' },
@@ -219,11 +219,7 @@ export const DEMO_REGISTRY: DemoEntry[] = [
     title: '地球公转',
     status: 'ready',
     engine: 'mixed',
-    steps: [
-      { id: 'tilt', title: '黄赤交角' },
-      { id: 'subsolar', title: '直射点移动' },
-      { id: 'seasons', title: '四季与五带' },
-    ],
+    steps: [{ id: 'overview', title: '综合演示' }],
     load: () => import('@/demos/earth-revolution/index.vue'),
   },
   // —— 选必1 第二章 ——
@@ -245,6 +241,7 @@ export const DEMO_REGISTRY: DemoEntry[] = [
     status: 'ready',
     engine: 'mixed',
     steps: [
+      { id: 'overview', title: '内力与外力' },
       { id: 'fold', title: '褶皱' },
       { id: 'fault', title: '断层' },
       { id: 'external', title: '外力作用' },

@@ -152,8 +152,10 @@ export const GlobeGridWidth = {
 
 /**
  * 实线 / 虚线约定（中学地图常见画法）
- * - 实线：主框架与过程线（轴、网、赤道、本初子午、晨昏）
+ * - 实线：主框架与过程线（轴、网、赤道、本初子午）
  * - 虚线：特殊纬线（回归线、极圈），与赤道区分
+ * - 普通网格细浅；背面由地球深度遮挡隐藏
+ * - 晨昏：共享地表材质的柔和霞光过渡
  */
 export const EarthLineStroke = {
   axis: 'solid',
@@ -164,9 +166,9 @@ export const EarthLineStroke = {
   tropic: 'dashed',
   /** ±66.5° */
   polar: 'dashed',
-  terminator: 'solid',
-  dawn: 'solid',
-  dusk: 'solid',
+  terminator: 'gradient',
+  dawn: 'gradient',
+  dusk: 'gradient',
   spin: 'solid',
 } as const
 

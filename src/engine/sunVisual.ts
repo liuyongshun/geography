@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 
 /** 版本号变更时强制绕过浏览器 / WebView 对 public 贴图的缓存 */
-export const SUN_TEX_VERSION = '20261022-realistic-alpha-a'
-export const SUN_TEXTURE_URL = `/textures/sun-realistic.png?v=${SUN_TEX_VERSION}`
+export const SUN_TEX_VERSION = '20261025-realistic-alpha-webp'
+export const SUN_TEXTURE_URL = `/textures/sun-realistic.webp?v=${SUN_TEX_VERSION}`
 
-/** 透明 PNG 做成朝向相机的单层日面，保留日珥且避免黑底暗边。 */
+/** 透明 WebP 做成朝向相机的单层日面，保留日珥且避免黑底暗边。 */
 export function makeSunBillboard(radius: number): {
   group: THREE.Group
   lookAt: (camera: THREE.Camera) => void
@@ -13,7 +13,7 @@ export function makeSunBillboard(radius: number): {
   const group = new THREE.Group()
   group.name = 'sun-realistic'
 
-  // PNG 还在解码时先显示圆形暖色占位，避免方形平面白闪。
+  // 贴图还在解码时先显示圆形暖色占位，避免方形平面白闪。
   const fallback = new THREE.Mesh(
     new THREE.CircleGeometry(radius * 0.82, 64),
     new THREE.MeshBasicMaterial({

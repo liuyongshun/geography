@@ -169,7 +169,7 @@ function drawGlobeLatMarks(
         .attr('y2', y)
         .attr('stroke', lat === 90 ? 'rgba(230,240,255,0.45)' : 'rgba(230,240,255,0.22)')
         .attr('stroke-width', lat === 90 ? 1 : 0.7)
-        .attr('stroke-dasharray', lat === 90 ? 'none' : '2 3')
+        .attr('stroke-dasharray', Math.abs(Math.abs(lat) - 23.5) < 0.1 || Math.abs(Math.abs(lat) - 66.5) < 0.1 ? '5 4' : null)
         .attr('style', 'pointer-events:none')
     }
     svg
@@ -229,9 +229,9 @@ function drawEarthDisc(
     .attr('x2', cx + Math.sqrt(Math.max(0, r * r - (ey - cy) * (ey - cy))))
     .attr('y1', ey)
     .attr('y2', ey)
-    .attr('stroke', DemoHex.lift)
+    .attr('stroke', DemoHex.earthEquator)
     .attr('stroke-width', 1.2)
-    .attr('stroke-dasharray', '4 3')
+    .attr('stroke-dasharray', null)
     .attr('opacity', 0.85)
   if (opts?.equatorLabel !== false) {
     svg

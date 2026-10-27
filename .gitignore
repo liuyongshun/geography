@@ -5,6 +5,7 @@ node_modules
 dist
 dist-ssr
 dist-portable
+/data/
 *.local
 
 # Logs
@@ -35,6 +36,11 @@ Thumbs.db
 coverage
 *.tsbuildinfo
 .cache/
+**/__pycache__/
+*.pyc
+
+# 根目录临时导出 / 草稿图（不入库）
+/world-ocean-currents.*
 
 # Tauri / Rust
 src-tauri/target

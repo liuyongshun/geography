@@ -55,8 +55,8 @@ async function goFullscreen() {
       </div>
     </header>
 
-    <div v-if="demo" class="body">
-      <aside class="side">
+    <div v-if="demo" class="body" :class="{ single: demo.steps.length <= 1 }">
+      <aside v-if="demo.steps.length > 1" class="side">
         <p class="side-label">课步</p>
         <nav class="steps">
           <button
@@ -138,6 +138,9 @@ async function goFullscreen() {
   display: grid;
   grid-template-columns: 100px 1fr;
   min-height: 0;
+}
+.body.single {
+  grid-template-columns: 1fr;
 }
 .side {
   border-right: 1px solid var(--border);

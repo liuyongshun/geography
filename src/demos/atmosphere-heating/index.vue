@@ -23,6 +23,18 @@ const canvasRef = ref<HTMLCanvasElement>()
 const focus = ref<'all' | 'ozone' | 'vapor' | 'scatter' | 'reflect'>('all')
 const mode = ref<'normal' | 'more'>('normal')
 const playing = ref(true)
+let scenePress: { x: number; y: number } | null = null
+
+function onScenePointerDown(event: PointerEvent) {
+  if (event.button === 0) scenePress = { x: event.clientX, y: event.clientY }
+}
+
+function onScenePointerUp(event: PointerEvent) {
+  if (!scenePress || event.button !== 0) return
+  const moved = Math.hypot(event.clientX - scenePress.x, event.clientY - scenePress.y)
+  scenePress = null
+  if (moved < 6) playing.value = !playing.value
+}
 
 const focuses = [
   { id: 'all', label: '全部' },
@@ -56,8 +68,6 @@ const hint = computed(() => {
 const R = 100
 const FOV = 32
 const SUN_DRAW = 5.6
-const EARTH_YAW = 1.35
-const SECTOR = 0.36
 
 type Poly = { points: THREE.Vector3[]; lens: number[]; total: number }
 type Runner = {
@@ -67,6 +77,8 @@ type Runner = {
   period: number
   mats: THREE.MeshBasicMaterial[]
   tip: number
+  head: number
+  tails: THREE.Mesh[]
 }
 type Beam = {
   id: string
@@ -100,13 +112,15 @@ let sunDispose: (() => void) | null = null
 let cloudTexture: THREE.Texture | null = null
 let tropoMat: THREE.MeshBasicMaterial | null = null
 let ozoneMat: THREE.MeshBasicMaterial | null = null
-let groundSkin: THREE.MeshBasicMaterial | null = null
-let groundDisc: THREE.MeshBasicMaterial | null = null
 let dustMat: THREE.PointsMaterial | null = null
 let coarseMat: THREE.PointsMaterial | null = null
 const beams: Beam[] = []
 const tags: Tag[] = []
 const clouds: THREE.Sprite[] = []
+const airFields: { attribute: THREE.BufferAttribute; samples: { h: number; e: number; s: number }[] }[] = []
+let reflection: { beam: Beam; sun: THREE.Vector3; tag: Tag; tagOffset: THREE.Vector3 } | null = null
+// 云层原位缓慢往复：约 25 秒一周期，水平幅度约为云宽的 5%。
+const swayEast = (base: number, time: number) => base + Math.sin(time * .25 + base * .05) * 1.5
 const normal = new THREE.Vector3()
 const east = new THREE.Vector3()
 const side = new THREE.Vector3()
@@ -124,7 +138,6 @@ let uvPulse = 0
 let irPulse = 0
 let groundPulse = 0
 let warmMix = 0
-let groundGlow = 0
 let resizeObs: ResizeObserver | null = null
 const tropoBase = new THREE.Color(Demo3.cold)
 const warmColor = new THREE.Color(Demo3.warm)
@@ -166,9 +179,12 @@ function desiredPose(): Pose {
     if (focus.value === 'scatter') return pose(-40, 28, 84, 10, 0, 2)
     return pose(-30, 26, 88, 12, 18, 2)
   }
-  if (props.stepId === 'sun-ground') return pose(-40, 24, 86, 6, 0, 0)
-  if (props.stepId === 'ground-air') return pose(-34, 22, 84, 11, -6, 0)
-  if (props.stepId === 'return') return pose(-28, 26, 88, 12, 8, 0)
+  // 正对气层剖面，局部地面法线作为画面上方；地球弧面位于下方。
+  return pose(0, 12, 112, 20, 0, 0)
+}
+
+/** 整章首次进入均从原来的斜视镜头转入正面剖面。 */
+function openingPose(): Pose {
   return pose(-46, 30, 92, 14, -6, 0)
 }
 
@@ -238,42 +254,35 @@ function addTag(text: string, pos: THREE.Vector3, color: string, gate: () => num
   const { sprite, baseW, baseH } = makeLabel(text, color, boxed)
   sprite.position.copy(pos)
   root!.add(sprite)
-  tags.push({ sprite, baseW, baseH, opacity: gate(), gate })
+  const tag = { sprite, baseW, baseH, opacity: gate(), gate }
+  tags.push(tag)
+  return tag
 }
 
-function annulusSector(inner: number, outer: number, a0: number, a1: number, seg = 28) {
-  const shape = new THREE.Shape()
-  for (let i = 0; i <= seg; i++) {
-    const a = a0 + ((a1 - a0) * i) / seg
-    const x = Math.sin(a) * outer
-    const y = Math.cos(a) * outer
-    if (i === 0) shape.moveTo(x, y)
-    else shape.lineTo(x, y)
-  }
-  for (let i = seg; i >= 0; i--) {
-    const a = a0 + ((a1 - a0) * i) / seg
-    shape.lineTo(Math.sin(a) * inner, Math.cos(a) * inner)
-  }
-  shape.closePath()
-  return shape
-}
-
-function makeBand(innerH: number, outerH: number, color: number, opacity: number) {
-  const shape = annulusSector(R + innerH, R + outerH, -SECTOR, SECTOR)
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: 18, bevelEnabled: false, steps: 1 })
-  geo.translate(0, 0, -9)
+/** 本章的教学气层为完整同心球壳，边缘稍亮以保留球体体积感。 */
+function makeAtmosphereShell(height: number, color: number, opacity: number) {
   const mat = new THREE.MeshBasicMaterial({
     color,
     transparent: true,
     opacity,
     depthWrite: false,
     side: THREE.DoubleSide,
-    toneMapped: true,
   })
-  const mesh = new THREE.Mesh(geo, mat)
-  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(east, normal, side))
-  mesh.renderOrder = 2
-  root!.add(mesh)
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = `varying vec3 vShellNormal; varying vec3 vShellView;\n${shader.vertexShader}`
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vShellNormal = normalize(normalMatrix * normal);
+        vShellView = -(modelViewMatrix * vec4(position, 1.0)).xyz;`)
+    shader.fragmentShader = `varying vec3 vShellNormal; varying vec3 vShellView;\n${shader.fragmentShader}`
+      .replace('#include <opaque_fragment>', `
+        float rim = 1.0 - abs(dot(normalize(vShellNormal), normalize(vShellView)));
+        diffuseColor.a *= 0.2 + 0.65 * pow(rim, 2.0);
+        #include <opaque_fragment>`)
+  }
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(R + height, 128, 96), mat)
+  shell.name = `teaching-atmosphere-${height}`
+  shell.renderOrder = 2
+  root!.add(shell)
   return mat
 }
 
@@ -294,6 +303,7 @@ function samplePoly(poly: Poly, dist: number) {
   return {
     pos: a.clone().lerp(b, t),
     tan: b.clone().sub(a).normalize(),
+    segmentDistance: d - poly.lens[i - 1]!,
   }
 }
 
@@ -331,11 +341,9 @@ function makeTube(a: THREE.Vector3, b: THREE.Vector3, radius: number, mat: THREE
 function makeArrow(color: number, shaft: number, head: number) {
   const mat = colorMat(color)
   const g = new THREE.Group()
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, shaft, 10), mat)
-  body.position.y = shaft / 2
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.95, head, 12), mat)
-  tip.position.y = shaft + head / 2
-  g.add(body, tip)
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(THREE.MathUtils.clamp(shaft * 0.045, 0.24, 0.38), head, 16), mat)
+  tip.position.y = -head / 2
+  g.add(tip)
   g.renderOrder = 7
   return { g, mat, tipLen: shaft + head }
 }
@@ -346,7 +354,7 @@ function addBeam(
   color: number,
   presence: Record<string, number>,
   focusesOn: string[],
-  opts?: { upperFrom?: number; pulse?: Beam['pulse']; count?: number; period?: number },
+  opts?: { upperFrom?: number; pulse?: Beam['pulse']; count?: number; period?: number; radius?: number; arrowScale?: number },
 ) {
   const poly = makePoly(segments.flat())
   const beam: Beam = {
@@ -365,7 +373,7 @@ function addBeam(
   for (const seg of segments) {
     for (let i = 1; i < seg.length; i++) {
       const upper = upperMat != null && i > (opts?.upperFrom ?? 0)
-      const mesh = makeTube(seg[i - 1]!, seg[i]!, 0.16, upper ? upperMat! : tubeMat)
+      const mesh = makeTube(seg[i - 1]!, seg[i]!, (opts?.radius ?? 0.15) * 0.45, upper ? upperMat! : tubeMat)
       root!.add(mesh)
       if (upper) {
         beam.upper = beam.upper ?? []
@@ -373,13 +381,22 @@ function addBeam(
       } else beam.tubes.push(mesh)
     }
   }
-  const count = opts?.count ?? (poly.total > 80 ? 3 : poly.total > 26 ? 2 : 1)
-  const head = Math.min(3.5, poly.total * 0.22)
-  const shaft = Math.min(11, Math.max(3.2, poly.total * 0.18))
+  const count = 1
+  const scale = opts?.arrowScale ?? 1
+  const head = Math.min(3.2, poly.total * 0.2) * scale
+  const shaft = Math.min(10, Math.max(3.6, poly.total * 0.17)) * scale
   const fit = shaft + head > poly.total * 0.8 ? (poly.total * 0.8) / (shaft + head) : 1
   for (let i = 0; i < count; i++) {
     const arrow = makeArrow(color, shaft * fit, head * fit)
     root!.add(arrow.g)
+    // 每段路径各有一段尾迹；转角时沿入射、反射两段折转，绝不外延。
+    const tails = poly.points.slice(1).map(() => {
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1, 12), arrow.mat)
+      tail.renderOrder = 7
+      tail.visible = false
+      root!.add(tail)
+      return tail
+    })
     beam.runners.push({
       arrow: arrow.g,
       poly,
@@ -387,11 +404,13 @@ function addBeam(
       period: opts?.period ?? (poly.total > 40 ? 4.2 : 3.1),
       mats: [arrow.mat],
       tip: arrow.tipLen,
+      head: head * fit,
+      tails,
     })
   }
   const end = poly.points[poly.points.length - 1]!
   if (opts?.pulse) {
-    const marker = new THREE.Mesh(new THREE.SphereGeometry(1.15, 16, 12), colorMat(color))
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 12), colorMat(color))
     marker.position.copy(end)
     marker.renderOrder = 8
     root!.add(marker)
@@ -410,6 +429,7 @@ function targetOpacity(beam: Beam) {
   if (beam.id === 'escape') o = step === 'return' ? (mode.value === 'more' ? 0.22 : 0.92) : o
   if (beam.id === 'back') o = step === 'return' ? (mode.value === 'more' ? 1 : 0.7) : o
   if (beam.id === 'backMore') o = step === 'return' && mode.value === 'more' ? 0.95 : 0
+  if (beam.id === 'reflect' && clouds[0]) o *= clouds[0].visible ? clouds[0].material.opacity / 0.94 : 0
   return o
 }
 
@@ -459,14 +479,19 @@ function addStars() {
 
 function addDust(count: number, size: number, color: number, h0: number, h1: number, spread: number) {
   const pos = new Float32Array(count * 3)
+  const samples: { h: number; e: number; s: number }[] = []
   for (let i = 0; i < count; i++) {
-    const p = at(h0 + Math.random() * (h1 - h0), (Math.random() - 0.5) * spread, (Math.random() - 0.5) * 8)
+    const sample = { h: h0 + Math.random() * (h1 - h0), e: (Math.random() - 0.5) * spread, s: (Math.random() - 0.5) * 8 }
+    samples.push(sample)
+    const p = at(sample.h, sample.e, sample.s)
     pos[i * 3] = p.x
     pos[i * 3 + 1] = p.y
     pos[i * 3 + 2] = p.z
   }
   const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  const attribute = new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)
+  geo.setAttribute('position', attribute)
+  airFields.push({ attribute, samples })
   const mat = new THREE.PointsMaterial({
     color,
     size,
@@ -484,45 +509,27 @@ function front(p: THREE.Vector3, lift = 0) {
 }
 
 function buildScene(sunCenter: THREE.Vector3) {
-  tropoMat = makeBand(1.1, 15.6, Demo3.cold, 0.2)
-  ozoneMat = makeBand(18.4, 24.2, Demo3.coldSoft, 0.34)
-  makeBand(25.2, 33.5, Demo3.air, 0.12)
-  groundSkin = makeBand(0.18, 0.62, Demo3.warm, 0.05)
-
-  const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(8.2, 48),
+  tropoMat = makeAtmosphereShell(15.6, Demo3.cold, 0.14)
+  ozoneMat = makeAtmosphereShell(24.2, Demo3.coldSoft, 0.34)
+  makeAtmosphereShell(33.5, Demo3.air, 0.12)
+  const groundRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.8, 0.9, 64),
     new THREE.MeshBasicMaterial({
-      color: Demo3.warm,
+      color: Demo3.lift,
       transparent: true,
-      opacity: 0,
+      opacity: 0.65,
       depthWrite: false,
       side: THREE.DoubleSide,
       toneMapped: false,
     }),
   )
-  groundDisc = disc.material
-  disc.position.copy(at(0.85))
-  disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
-  disc.renderOrder = 4
-  root!.add(disc)
-
-  const loader = new THREE.TextureLoader()
-  loader.load('/textures/weather/cloud-realistic.png', (tex) => {
-    if (disposed) {
-      tex.dispose()
-      return
-    }
-    tex.colorSpace = THREE.SRGBColorSpace
-    cloudTexture = tex
-    for (const spr of clouds) {
-      const mat = spr.material
-      mat.map = tex
-      mat.needsUpdate = true
-    }
-  })
+  groundRing.position.copy(at(0.15))
+  groundRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
+  groundRing.renderOrder = 4
+  root!.add(groundRing)
 
   const cloudSpots: Array<[number, number, number, number]> = [
-    [11, 16, 4, 1.2],
+    [11, 26, 4, 1.2],
     [9, -30, 2, 0.82],
     [12, -8, -4, 0.66],
   ]
@@ -535,14 +542,31 @@ function buildScene(sunCenter: THREE.Vector3) {
       alphaTest: 0.18,
     })
     const spr = new THREE.Sprite(mat)
+    // 无贴图的 Sprite 会显示整块白色矩形，透明云图就绪前不参与渲染。
+    spr.visible = false
     spr.position.copy(at(h, e, s))
     spr.scale.set(30 * sc, 12 * sc, 1)
-    spr.userData.base = spr.position.clone()
-    spr.userData.phase = Math.random() * Math.PI * 2
+    spr.userData.wind = { h, e, s }
     spr.renderOrder = 5
     root!.add(spr)
     clouds.push(spr)
   }
+
+  const loader = new THREE.TextureLoader()
+  loader.load('/textures/weather/cloud-realistic.webp', (tex) => {
+    if (disposed) {
+      tex.dispose()
+      return
+    }
+    tex.colorSpace = THREE.SRGBColorSpace
+    cloudTexture = tex
+    for (const spr of clouds) {
+      const mat = spr.material
+      mat.map = tex
+      mat.needsUpdate = true
+      spr.visible = true
+    }
+  })
 
   dustMat = addDust(48, 0.55, Demo3.cold, 3, 14, 36)
   coarseMat = addDust(14, 1.15, Demo3.cloud, 8, 13, 18)
@@ -554,7 +578,7 @@ function buildScene(sunCenter: THREE.Vector3) {
   }
 
   const uvEnd = at(21.2, -18, 1)
-  const irEnd = at(8.4, 18, -2)
+  const irEnd = at(8.4, 7, -2)
   const arriveStart = rayStart(groundPoint)
   const scatterPoint = pointAtRadius(arriveStart, groundPoint, R + 8.2)
 
@@ -570,79 +594,90 @@ function buildScene(sunCenter: THREE.Vector3) {
     Demo3.lift,
     { weaken: 0.72, 'sun-ground': 1, 'ground-air': 0.22, return: 0.1 },
     [],
-    { pulse: 'ground', count: 3 },
+    { pulse: 'ground', count: 2, radius: 0.18 },
   )
 
-  const inDir = groundPoint.clone().sub(sunCenter).normalize()
-  const p1 = new THREE.Vector3().crossVectors(inDir, normal).normalize()
-  const p2 = new THREE.Vector3().crossVectors(inDir, p1).normalize()
-  const branchDirs = [p1, p1.clone().negate(), p2, p1.clone().multiplyScalar(0.6).add(p2).normalize()]
-  const branches = branchDirs.filter((d) => d.dot(normal) > -0.05).slice(0, 4)
-  for (const dir of branches) {
-    const end = scatterPoint.clone().addScaledVector(dir, 13)
-    addBeam('scatter', [[scatterPoint.clone(), end]], Demo3.cold, { weaken: 1 }, ['scatter'], {
+  // 几条短光路从同一散射点向不同方向展开，保持为紧凑的小范围示意。
+  const scatterBranches = [
+    [-7, 3.5, 0.8],
+    [-4.5, -4, 1.2],
+    [2, 6, 0.5],
+    [6, -1.5, 1],
+  ]
+  scatterBranches.forEach(([e, h, s], index) => {
+    const end = scatterPoint.clone().addScaledVector(east, e!).addScaledVector(normal, h!).addScaledVector(side, s!)
+    const beam = addBeam('scatter', [[scatterPoint.clone(), end]], index % 2 ? 0xa8a2ff : 0x78d9ff, { weaken: 1 }, ['scatter'], {
       count: 1,
       period: 2.8,
+      arrowScale: 0.65,
     })
-  }
+    for (const runner of beam.runners) {
+      runner.arrow.scale.x = runner.arrow.scale.z = 0.75
+      for (const tail of runner.tails) tail.scale.x = tail.scale.z = 0.75
+    }
+  })
 
-  const cloudCenter = at(11, 16, 4)
+  const cloudCenter = at(11, 26, 4)
   const toCloud = cloudCenter.clone().sub(sunCenter).normalize()
   const hit = cloudCenter.clone().addScaledVector(toCloud, -8)
   const reflected = toCloud.clone().sub(normal.clone().multiplyScalar(2 * toCloud.dot(normal)))
   reflected.addScaledVector(normal, 0.85).normalize()
   const bounceEnd = hit.clone().addScaledVector(reflected, 22)
-  addBeam('reflect', [[rayStart(hit), hit, bounceEnd]], Demo3.cloud, { weaken: 1 }, ['reflect'], { count: 2 })
+  const reflectBeam = addBeam('reflect', [[rayStart(hit), hit, bounceEnd]], Demo3.cloud, { weaken: 1 }, ['reflect'], { count: 1, radius: 0.18 })
 
   const ups = [
-    [-10, 0],
-    [-3, 2],
-    [5, -1],
+    [-8, 0],
   ]
   for (const [e, s] of ups) {
     addBeam('up', [[at(1.3, e, s), at(13.2, e, s)]], Demo3.warm, { 'ground-air': 1, return: 0.38 }, [], {
       count: 1,
-      period: 3.6,
+      period: 4,
+      radius: 0.21,
+      arrowScale: 1.12,
     })
   }
 
   const escA = at(13.5, 2, -2)
   const escB = at(23, 8, -1)
   const escC = at(58, 18, 2)
-  addBeam('escape', [[escA, escB, escC]], Demo3.warm, { return: 0.9 }, [], { upperFrom: 1, count: 2 })
+  addBeam('escape', [[escA, escB, escC]], Demo3.warm, { return: 0.9 }, [], {
+    upperFrom: 1,
+    count: 1,
+    radius: 0.21,
+    arrowScale: 1.18,
+  })
 
-  const backs = [
-    [12, 1],
-    [20, -2],
-  ]
+  const backs = [[12, 1]]
   for (const [e, s] of backs) {
-    addBeam('back', [[at(13.4, e, s), at(1.5, e, s)]], Demo3.warm, { return: 0.75 }, [], { count: 1, period: 3.4 })
-  }
-  for (const [e, s] of [
-    [2, 3],
-    [16, 2],
-  ] as Array<[number, number]>) {
-    addBeam('backMore', [[at(14, e, s), at(1.5, e, s)]], Demo3.warm, {}, [], { count: 1, period: 3.2 })
+    addBeam('back', [[at(13.4, e, s), at(1.5, e, s)]], Demo3.warm, { return: 0.75 }, [], {
+      count: 1,
+      period: 4.2,
+      radius: 0.22,
+      arrowScale: 1.16,
+    })
   }
 
-  addTag('地面', front(at(2.4, -6, 6)), DemoHex.inkMuted, () => 0.85)
-  addTag('对流层 · 水汽、CO₂', front(at(8, -10, 8)), DemoHex.cold, () => 0.92)
-  addTag('平流层 · 臭氧', front(at(30, -34, 0)), DemoHex.coldSoft, () => 0.92)
+  addTag('中国 · 受热地表', front(at(2.4, -6, 6)), DemoHex.inkMuted, () => 0.85)
+  // 层名统一排在左侧，各自位于对应球壳范围内，避开中央的辐射通道。
+  addTag('对流层 · 水汽、CO₂', front(at(8, -30, 0)), DemoHex.cold, () => 0.96, true)
+  addTag('平流层 · 臭氧', front(at(20, -30, 0)), DemoHex.coldSoft, () => 0.96, true)
+  addTag('高层大气', front(at(29, -30, 0)), DemoHex.inkMuted, () => 0.96, true)
   addTag(
     '短波辐射',
     pointAtRadius(arriveStart, groundPoint, R + 18).addScaledVector(east, -16).addScaledVector(side, 5),
     DemoHex.lift,
     () => (props.stepId === 'sun-ground' ? 1 : 0),
   )
-  addTag('臭氧吸收紫外', front(uvEnd, 3).addScaledVector(east, -16), DemoHex.cold, () => shown('uv'))
+  addTag('臭氧吸收紫外', front(uvEnd).addScaledVector(east, 8), DemoHex.cold, () => shown('uv'))
   addTag(
     '水汽吸收红外',
     irEnd.clone().addScaledVector(east, -12).addScaledVector(normal, 4),
     DemoHex.warm,
     () => shown('ir'),
   )
-  addTag('散射蓝紫光', front(scatterPoint, 2).addScaledVector(east, -14), DemoHex.cold, () => shown('scatter'))
-  addTag('云层反射', front(hit, 4), DemoHex.ink, () => shown('reflect'))
+  addTag('蓝紫光散射', scatterPoint.clone().addScaledVector(east, -10).addScaledVector(normal, 4), '#78d9ff', () => shown('scatter'))
+  const reflectTag = addTag('云层反射', front(hit, 4).addScaledVector(east, 7), DemoHex.ink, () => shown('reflect'))
+  reflection = { beam: reflectBeam, sun: sunCenter.clone(), tag: reflectTag, tagOffset: reflectTag.sprite.position.clone().sub(hit) }
   addTag('太阳暖大地', front(at(3.2, -6, 2)), DemoHex.lift, () => (props.stepId === 'sun-ground' ? 1 : 0))
   addTag('地面长波', front(at(6, -12, 2)), DemoHex.warm, () => (props.stepId === 'ground-air' ? 1 : 0))
   addTag('大气吸收', front(at(14, -6, 0), 1), DemoHex.warm, () => (props.stepId === 'ground-air' ? 1 : 0))
@@ -664,9 +699,10 @@ function setupScene() {
   const w = wrapRef.value.clientWidth || 800
   const h = Math.max(320, wrapRef.value.clientHeight || 480)
 
-  const lat = THREE.MathUtils.degToRad(24)
-  const lon = THREE.MathUtils.degToRad(35)
-  normal.set(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)).normalize()
+  // SphereGeometry 的贴图经度向 -Z 增加；将教学落点精确放在中国内陆。
+  const lat = THREE.MathUtils.degToRad(31)
+  const lon = THREE.MathUtils.degToRad(105)
+  normal.set(Math.cos(lat) * Math.cos(lon), Math.sin(lat), -Math.cos(lat) * Math.sin(lon)).normalize()
   east.crossVectors(new THREE.Vector3(0, 1, 0), normal)
   if (east.lengthSq() < 1e-6) east.set(1, 0, 0)
   east.normalize()
@@ -675,6 +711,7 @@ function setupScene() {
   scene = new THREE.Scene()
   scene.background = new THREE.Color(Demo3.canvas)
   camera = new THREE.PerspectiveCamera(FOV, w / h, 0.4, 2200)
+  camera.up.copy(normal)
   renderer = new THREE.WebGLRenderer({ canvas: canvasRef.value, antialias: true, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(w, h, false)
@@ -698,25 +735,14 @@ function setupScene() {
   scene.add(root)
   addStars()
 
-  const opening = desiredPose()
+  const opening = openingPose()
   camera.position.copy(opening.pos)
   controls.target.copy(opening.target)
   controls.update()
 
   camera.updateMatrixWorld()
-  const view = opening.target.clone().sub(opening.pos).normalize()
-  const right = new THREE.Vector3().crossVectors(view, new THREE.Vector3(0, 1, 0))
-  if (right.lengthSq() < 1e-6) right.set(1, 0, 0)
-  right.normalize()
-  const up = new THREE.Vector3().crossVectors(right, view).normalize()
-  const dist = opening.pos.distanceTo(opening.target)
-  // 与气柱差不多远，落在画面左上方，避免贴到镜头前变成满屏日面。
-  const sunCenter = opening.target
-    .clone()
-    .addScaledVector(right, -dist * 0.18)
-    .addScaledVector(up, dist * 0.16)
-    .addScaledVector(normal, 10)
-  if (sunCenter.length() < R + 30) sunCenter.addScaledVector(normal, 36)
+  // 太阳的位置由气层坐标确定，避免随进入课步的初始镜头漂移。
+  const sunCenter = at(44, -22, 0)
 
   const sun = makeSunBillboard(SUN_DRAW)
   sun.group.position.copy(sunCenter)
@@ -725,20 +751,19 @@ function setupScene() {
   sunDispose = sun.dispose
 
   const worldSun = sunCenter.clone().normalize()
-  earth = createRealisticEarth(renderer, R, worldSun.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -EARTH_YAW), {
+  earth = createRealisticEarth(renderer, R, worldSun, {
     segments: 96,
     atmosphereScale: 1.05,
     atmosphereStrength: 0.95,
     nightIntensity: 1.15,
   })
-  earth.surface.rotation.y = EARTH_YAW
-  earth.atmosphere.rotation.y = EARTH_YAW
   root.add(earth.surface, earth.atmosphere)
 
   buildScene(sunCenter)
   for (const beam of beams) beam.opacity = targetOpacity(beam)
   clock = 0
   lastStamp = performance.now()
+  startBlend()
   loop()
 }
 
@@ -751,24 +776,41 @@ function updateBeams(dt: number) {
     const show = beam.opacity > 0.025
     for (const tube of beam.tubes) {
       const mat = tube.material as THREE.MeshBasicMaterial
-      mat.opacity = beam.opacity * 0.34
+      mat.opacity = beam.opacity * (beam.id === 'scatter' ? 0.42 : 0.16)
       tube.visible = show
     }
     for (const tube of beam.upper ?? []) {
       const mat = tube.material as THREE.MeshBasicMaterial
-      mat.opacity = beam.opacity * (enhanced ? 0.08 : 0.34)
+      mat.opacity = beam.opacity * (enhanced ? 0.04 : 0.16)
       tube.visible = show && mat.opacity > 0.02
     }
     for (const runner of beam.runners) {
       const u = ((clockSec() / runner.period + runner.phase) % 1)
       const fade = smoothstep(0, 0.07, u) * (1 - smoothstep(0.9, 1, u))
       const dist = u * beam.limitU * runner.poly.total
-      const { pos, tan } = samplePoly(runner.poly, dist)
-      runner.arrow.position.copy(pos).addScaledVector(tan, -runner.tip)
+      const { pos, tan, segmentDistance } = samplePoly(runner.poly, dist)
+      const headLength = Math.min(runner.head, segmentDistance)
+      runner.arrow.position.copy(pos)
+      runner.arrow.scale.y = headLength / runner.head
       if (tan.lengthSq() > 0) runner.arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan)
       const o = beam.opacity * fade
       for (const mat of runner.mats) mat.opacity = o
       runner.arrow.visible = o > 0.03
+      const tailStart = Math.max(0, dist - runner.tip)
+      const tailEnd = Math.max(0, dist - headLength)
+      runner.tails.forEach((tail, index) => {
+        const start = Math.max(tailStart, runner.poly.lens[index]!)
+        const end = Math.min(tailEnd, runner.poly.lens[index + 1]!)
+        tail.visible = o > 0.03 && end - start > 0.001
+        if (!tail.visible) return
+        const a = runner.poly.points[index]!
+        const b = runner.poly.points[index + 1]!
+        const direction = b.clone().sub(a).normalize()
+        const offset = (start + end) / 2 - runner.poly.lens[index]!
+        tail.position.copy(a).addScaledVector(direction, offset)
+        tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
+        tail.scale.y = end - start
+      })
       if (beam.pulse && u * beam.limitU > 0.86 && fade > 0.35) {
         if (beam.pulse === 'uv') uvPulse = 1
         if (beam.pulse === 'ir') irPulse = 1
@@ -786,6 +828,41 @@ function updateBeams(dt: number) {
   }
 }
 
+function updateAtmosphereMotion() {
+  clouds.forEach((spr) => {
+    const { h, e, s } = spr.userData.wind as { h: number; e: number; s: number }
+    spr.position.copy(at(h + Math.sin(clock * .22 + e * .05) * .45, swayEast(e, clock), s + Math.sin(clock * .2 + e * .05) * .35))
+  })
+  for (const { attribute, samples } of airFields) {
+    samples.forEach((sample, i) => {
+      const p = at(sample.h + Math.sin(clock * .25 + i) * .12, sample.e + Math.sin(clock * .2 + i) * .18, sample.s)
+      attribute.setXYZ(i, p.x, p.y, p.z)
+    })
+    attribute.needsUpdate = true
+  }
+  // 反射点随云一起移动，入射线始终从太阳出发，避免光路与云层脱节。
+  if (reflection && clouds[0]) {
+    const { beam, sun, tag, tagOffset } = reflection
+    const cloud = clouds[0]
+    const outward = cloud.position.clone().normalize()
+    const incident = cloud.position.clone().sub(sun).normalize()
+    const hit = cloud.position.clone().addScaledVector(incident, -8)
+    const bounce = incident.clone().sub(outward.clone().multiplyScalar(2 * incident.dot(outward))).addScaledVector(outward, .85).normalize()
+    const points = [sun.clone().addScaledVector(incident, SUN_DRAW + .8), hit, hit.clone().addScaledVector(bounce, 22)]
+    const poly = makePoly(points)
+    beam.runners.forEach((runner) => { runner.poly = poly })
+    beam.tubes.forEach((tube, i) => {
+      const a = points[i]!
+      const b = points[i + 1]!
+      const direction = b.clone().sub(a)
+      tube.position.copy(a).add(b).multiplyScalar(.5)
+      tube.scale.y = direction.length() / (tube.geometry as THREE.CylinderGeometry).parameters.height
+      tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
+    })
+    tag.sprite.position.copy(hit).add(tagOffset)
+  }
+}
+
 function clockSec() {
   return clock
 }
@@ -799,7 +876,8 @@ function loop() {
   if (playing.value) clock += dt
 
   if (!dragging && camMix < 1) {
-    camMix = Math.min(1, camMix + dt / 0.85)
+    const blendDuration = 2.2
+    camMix = Math.min(1, camMix + dt / blendDuration)
     const k = camMix * camMix * (3 - 2 * camMix)
     camera.position.lerpVectors(blendFromPos, blendToPos, k)
     controls.target.lerpVectors(blendFromTarget, blendToTarget, k)
@@ -810,30 +888,15 @@ function loop() {
   uvPulse = Math.max(0, uvPulse - dt * 0.85)
   irPulse = Math.max(0, irPulse - dt * 0.85)
   groundPulse = Math.max(0, groundPulse - dt * 0.7)
+  updateAtmosphereMotion()
   updateBeams(dt)
 
   const step = props.stepId
   const warmTarget =
-    step === 'ground-air' ? 0.42 : step === 'return' ? (mode.value === 'more' ? 0.82 : 0.38) : 0
+    step === 'ground-air' ? 0.16 : step === 'return' ? (mode.value === 'more' ? 0.3 : 0.14) : 0
   warmMix = damp(warmMix, warmTarget, dt, 3.2)
   if (tropoMat) tropoMat.color.copy(tropoBase).lerp(warmColor, warmMix)
   if (ozoneMat) ozoneMat.opacity = 0.3 + uvPulse * 0.35 + (step === 'weaken' && focus.value === 'ozone' ? 0.18 : 0)
-
-  const glowTarget =
-    step === 'sun-ground'
-      ? 0.62
-      : step === 'ground-air'
-        ? 0.5
-        : step === 'return'
-          ? mode.value === 'more'
-            ? 0.88
-            : 0.4
-          : focus.value === 'all'
-            ? 0.16
-            : 0.05
-  groundGlow = damp(groundGlow, glowTarget + groundPulse * 0.22, dt, 3.5)
-  if (groundDisc) groundDisc.opacity = groundGlow
-  if (groundSkin) groundSkin.opacity = 0.08 + groundGlow * 0.55
 
   if (dustMat) {
     const on = step === 'weaken' && (focus.value === 'all' || focus.value === 'scatter')
@@ -843,11 +906,6 @@ function loop() {
     const on = step === 'weaken' && (focus.value === 'all' || focus.value === 'reflect')
     coarseMat.opacity = damp(coarseMat.opacity, on ? 0.8 : 0.06, dt, 4)
   }
-
-  clouds.forEach((spr, i) => {
-    const base = spr.userData.base as THREE.Vector3
-    spr.position.copy(base).addScaledVector(normal, Math.sin(clock * 0.7 + i) * 0.28)
-  })
 
   const distRef = 110
   for (const tag of tags) {
@@ -917,10 +975,10 @@ function teardown() {
   beams.length = 0
   tags.length = 0
   clouds.length = 0
+  airFields.length = 0
+  reflection = null
   tropoMat = null
   ozoneMat = null
-  groundSkin = null
-  groundDisc = null
   dustMat = null
   coarseMat = null
 }
@@ -964,12 +1022,10 @@ onUnmounted(teardown)
         <button type="button" class="btn" :class="{ on: mode === 'normal' }" @click="mode = 'normal'">自然保温</button>
         <button type="button" class="btn" :class="{ on: mode === 'more' }" @click="mode = 'more'">温室效应增强</button>
       </div>
-      <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-        {{ playing ? '暂停' : '继续' }}
-      </button>
+      <span class="hint">点击场景暂停 / 恢复</span>
     </div>
     <div ref="wrapRef" class="stage">
-      <canvas ref="canvasRef" />
+      <canvas ref="canvasRef" @pointerdown="onScenePointerDown" @pointerup="onScenePointerUp" />
       <aside class="hud" data-dili-chrome>
         <p class="hud-title">{{ title }}</p>
         <p class="hud-desc">临边视角 · 大气厚度已放大 · 拖拽可环视</p>

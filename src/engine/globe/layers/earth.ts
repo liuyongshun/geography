@@ -56,7 +56,7 @@ export class EarthLayer implements GlobeLayer {
     this.globe = new ThreeGlobe({ waitForGlobeReady: true, animateIn: false })
       .globeImageUrl(MARBLE)
       .bumpImageUrl(BUMP)
-      .showAtmosphere(true)
+      .showAtmosphere(false)
       .atmosphereColor('#4a90c8')
       .atmosphereAltitude(0.12)
       .showGraticules(false)
@@ -141,7 +141,7 @@ export class EarthLayer implements GlobeLayer {
       this.overlayMaterial.map = tex
       this.overlayMaterial.needsUpdate = true
       this.globe.globeMaterial(this.overlayMaterial)
-      this.globe.showAtmosphere(true)
+      this.globe.showAtmosphere(false)
       this.globe.atmosphereColor('#152238')
       this.globe.atmosphereAltitude(0.09)
     }
@@ -190,7 +190,7 @@ export class EarthLayer implements GlobeLayer {
       this.overlayMaterial.map = tex
       this.overlayMaterial.needsUpdate = true
       this.globe.globeMaterial(this.overlayMaterial)
-      this.globe.showAtmosphere(true)
+      this.globe.showAtmosphere(false)
       this.globe.atmosphereColor('#4a90c8')
       this.globe.atmosphereAltitude(0.11)
     } catch (err) {
@@ -212,7 +212,7 @@ export class EarthLayer implements GlobeLayer {
     this.globe.globeMaterial(this.dayMaterial)
     this.globe.globeImageUrl(MARBLE)
     this.globe.bumpImageUrl(BUMP)
-    this.globe.showAtmosphere(true)
+    this.globe.showAtmosphere(false)
     this.globe.atmosphereColor('#4a90c8')
     this.globe.atmosphereAltitude(0.12)
   }

@@ -15,7 +15,7 @@ alwaysApply: false
 | 3D 球、直射点、洋流箭头、气压带 | `Three.js` / `three-globe`（`GlobeHost`） |
 | 有时间顺序的过程（喷发成岩、锋面过境等） | `Three.js` 微场景 + `progress` 时间线 |
 | 循环图式、类型卡片、地带谱、补给示意 | `d3` / 手写 SVG |
-| 区域填色、调配线路、一带一路、产业转移 | `maplibre-gl` |
+| 区域填色、调配线路、一带一路、产业转移 | MapLibre（按需安装 `maplibre-gl`；`demoRegistry` 引擎标签已预留） |
 | 温湿柱、产业结构、时间序列 | `echarts` |
 
 禁止：用 ECharts 硬画锋面/洋流；用 MapLibre 代替教学示意剖面；过程课只用干巴静态框图。

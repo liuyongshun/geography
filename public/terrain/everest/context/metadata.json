@@ -1,0 +1,16 @@
+{
+  "gridSize": 257,
+  "bboxWGS84": [
+    86.84,
+    27.9,
+    87.02,
+    28.07
+  ],
+  "widthMeters": 17694.612849012286,
+  "heightMeters": 18797.580000000187,
+  "minElevation": 4513.74462890625,
+  "maxElevation": 8740.740234375,
+  "terrainSource": "Mapzen Terrain Tiles / AWS Open Data; wider context, coarser than the summit DEM",
+  "attribution": "Terrain data © Mapzen; https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+  "description": "Real elevation with stylized earth-tone colors for peripheral visual transition; colors do not represent measured vegetation."
+}

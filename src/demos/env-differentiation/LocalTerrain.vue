@@ -110,6 +110,11 @@ const sunnyLabelEl = ref<HTMLElement | null>(null)
 const shadyLabelEl = ref<HTMLElement | null>(null)
 const valleyLabelEl = ref<HTMLElement | null>(null)
 const waterLabelEl = ref<HTMLElement | null>(null)
+const compassRoseEl = ref<HTMLElement | null>(null)
+const compassNorthEl = ref<HTMLElement | null>(null)
+const compassEastEl = ref<HTMLElement | null>(null)
+const compassSouthEl = ref<HTMLElement | null>(null)
+const compassWestEl = ref<HTMLElement | null>(null)
 const driftingClouds: Array<{ sprite: THREE.Sprite; originX: number; travel: number; speed: number }> = []
 let lakeMaterial: THREE.MeshPhysicalMaterial | null = null
 let terrainMaterial: THREE.MeshStandardMaterial | null = null
@@ -120,6 +125,10 @@ const WORLD_WIDTH = 164
 const WORLD_DEPTH = 156
 /** 40 km 场景中的约 6.8 km 高差；仅做约 1.2 倍教学夸张。 */
 const WORLD_RELIEF = 34
+/** 真实栅格方位：+X 东、-X 西、-Z 北、+Z 南；太阳按北半球午后西南来光设置。 */
+const SUN_VISUAL_POSITION = new THREE.Vector3(-20, 50, 20)
+const SUN_LIGHT_POSITION = new THREE.Vector3(-70, 95, 65)
+const SUN_RAY_DIRECTION = new THREE.Vector3(1, -0.54, -0.46).normalize()
 let heightValues: Uint16Array | null = null
 let heightGridSize = 0
 let desiredCamera = new THREE.Vector3(106, 80, 135)
@@ -310,27 +319,45 @@ function addSun(parent: THREE.Group) {
     toneMapped: false,
   })
   const sun = new THREE.Sprite(sunMaterial)
-  sun.position.set(-53, 58, -32)
-  sun.scale.set(13.5, 13.5, 1)
+  sun.position.copy(SUN_VISUAL_POSITION)
+  sun.scale.set(10, 10, 1)
   sun.renderOrder = 3
   parent.add(sun)
 }
 
+function addThinSunRay(parent: THREE.Group, end: THREE.Vector3, length: number, opacity: number) {
+  const start = end.clone().addScaledVector(SUN_RAY_DIRECTION, -length)
+  const geometry = new THREE.BufferGeometry().setFromPoints([start, end])
+  const material = new THREE.LineBasicMaterial({
+    color: 0xefb73f,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+  })
+  const line = new THREE.Line(geometry, material)
+  line.renderOrder = 7
+  parent.add(line)
+
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.34, 1.45, 10),
+    new THREE.MeshBasicMaterial({ color: 0xefb73f, transparent: true, opacity: opacity + 0.12 }),
+  )
+  arrow.position.copy(end).addScaledVector(SUN_RAY_DIRECTION, -2.3)
+  arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), SUN_RAY_DIRECTION)
+  arrow.renderOrder = 7
+  parent.add(arrow)
+}
+
 function addSlopeState(parent: THREE.Group) {
-  // 朝南的阳坡在海螺沟北壁；光线从西南落到坡面。
-  const hits: Array<[number, number]> = [[26, 8], [33, 6.5], [40, 5]]
+  // 朝南的阳坡在海螺沟北壁；平行细光线从西南落到坡面。
+  const hits: Array<[number, number]> = [[24, 9], [30, 7.5], [36, 6], [42, 4.5]]
   hits.forEach(([x, z], i) => {
-    const y = terrainHeight(x, z)
-    makeFlow(parent, [
-      new THREE.Vector3(x - 14, y + 16, z + 11),
-      new THREE.Vector3(x - 6, y + 7, z + 4.5),
-      new THREE.Vector3(x, y + 1.15, z),
-    ], 0xe7b953, i * 0.28, 0.05, 0.28, 3)
+    addThinSunRay(parent, surfacePoint(x, z, 1.15), 45 + i * 2.5, 0.68 + i * 0.05)
   })
 }
 
 function addClimateState(parent: THREE.Group) {
-  const drains = [
+  const drains: Array<Array<[number, number]>> = [
     [[18, 28], [16.5, 24], [18.9, 20.7]],
     [[40, 24], [39, 20], [37, 16], [35, 14]],
     [[27.2, 0.3], [36.2, 0.9], [40.4, 4.3], [46.4, 10.7]],
@@ -402,8 +429,8 @@ function addWaterState(parent: THREE.Group) {
 async function loadAtmosphereTextures() {
   const loader = new THREE.TextureLoader()
   ;[sunTexture, cloudTexture] = await Promise.all([
-    loader.loadAsync('/textures/sun-realistic.png'),
-    loader.loadAsync('/textures/weather/cloud-realistic.png'),
+    loader.loadAsync('/textures/sun-realistic.webp'),
+    loader.loadAsync('/textures/weather/cloud-realistic.webp'),
   ])
   sunTexture.colorSpace = THREE.SRGBColorSpace
   cloudTexture.colorSpace = THREE.SRGBColorSpace
@@ -444,7 +471,7 @@ function addAtmosphere(root: THREE.Group) {
 
 const FRAMES: Record<Exclude<FactorId, 'water'>, [THREE.Vector3, THREE.Vector3]> = {
   overview: [new THREE.Vector3(106, 80, 135), new THREE.Vector3(0, 16, 0)],
-  slope: [new THREE.Vector3(58, 28, 36), new THREE.Vector3(34, 13, 14)],
+  slope: [new THREE.Vector3(82, 48, 74), new THREE.Vector3(26, 18, 10)],
   climate: [new THREE.Vector3(70, 26, 4), new THREE.Vector3(34, 12, 15)],
   ground: [new THREE.Vector3(22, 28, 108), new THREE.Vector3(-6, 13, 70)],
 }
@@ -524,6 +551,25 @@ function placeLabel(el: HTMLElement | null, x: number, z: number, lift: number) 
   el.style.left = `${px}px`
   el.style.top = `${py}px`
   el.style.opacity = visible ? '' : '0'
+}
+
+function updateCompass() {
+  if (!camera || !controls || !compassRoseEl.value) return
+  const base = controls.target.clone().project(camera)
+  const north = controls.target.clone().add(new THREE.Vector3(0, 0, -20)).project(camera)
+  const dx = north.x - base.x
+  const dy = -(north.y - base.y)
+  if (Math.hypot(dx, dy) < 1e-5) return
+  const northAngle = Math.atan2(dx, -dy)
+  compassRoseEl.value.style.transform = `translate(-50%, -50%) rotate(${northAngle}rad)`
+  const radius = 25
+  const labels = [compassNorthEl.value, compassEastEl.value, compassSouthEl.value, compassWestEl.value]
+  labels.forEach((label, index) => {
+    if (!label) return
+    const angle = northAngle + index * Math.PI / 2
+    label.style.left = `${35 + Math.sin(angle) * radius}px`
+    label.style.top = `${35 - Math.cos(angle) * radius}px`
+  })
 }
 
 function onPointerDown(event: PointerEvent) {
@@ -622,7 +668,7 @@ async function initThree() {
   const hemi = new THREE.HemisphereLight(0xc5e8ff, 0x3a3525, 1.65)
   scene.add(hemi)
   const sun = new THREE.DirectionalLight(0xffe7bd, 5.25)
-  sun.position.set(-70, 95, 65)
+  sun.position.copy(SUN_LIGHT_POSITION)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)
   sun.shadow.camera.left = -100
@@ -694,6 +740,7 @@ async function initThree() {
     placeLabel(shadyLabelEl.value, labelAnchors.shady.x, labelAnchors.shady.z, 3.6)
     placeLabel(valleyLabelEl.value, labelAnchors.valley.x, labelAnchors.valley.z, 3.2)
     placeLabel(waterLabelEl.value, labelAnchors.water.x, labelAnchors.water.z, 3.2)
+    updateCompass()
     if (renderer && scene && camera) renderer.render(scene, camera)
   }
   raf = requestAnimationFrame(render)
@@ -749,6 +796,19 @@ onUnmounted(() => {
       <i />
       <b>河谷水系</b>
       <span>降水与融水汇流</span>
+    </div>
+
+    <div class="scene-compass" aria-label="动态方位：上北、右东、下南、左西，随视角旋转">
+      <div ref="compassRoseEl" class="compass-rose" aria-hidden="true">
+        <i class="north-arrow" />
+        <i class="south-tail" />
+        <span class="east-west-axis" />
+      </div>
+      <b ref="compassNorthEl" class="north">北</b>
+      <b ref="compassEastEl">东</b>
+      <b ref="compassSouthEl">南</b>
+      <b ref="compassWestEl">西</b>
+      <small>方位</small>
     </div>
 
     <aside class="factor-panel" :style="{ '--factor-tone': active.tone }">
@@ -862,6 +922,50 @@ onUnmounted(() => {
 .shady-label i { background: #6ad99c; box-shadow: 0 0 0 3px rgb(106 217 156 / 14%), 0 0 10px #6ad99c; }
 .valley-label { top: 67%; left: 47%; }
 .lake-label { top: 73%; left: 67%; }
+.scene-compass {
+  position: absolute;
+  z-index: 5;
+  left: 22px;
+  bottom: 82px;
+  width: 70px;
+  height: 70px;
+  border: 1px solid rgb(158 216 255 / 24%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(7 20 31 / 88%) 0 43%, rgb(7 20 31 / 66%) 44% 100%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 28%), inset 0 0 18px rgb(126 203 239 / 7%);
+  pointer-events: none;
+}
+.compass-rose { position: absolute; top: 35px; left: 35px; width: 42px; height: 42px; transform-origin: center; }
+.compass-rose i, .compass-rose span { position: absolute; display: block; left: 50%; transform: translateX(-50%); }
+.north-arrow {
+  top: 0;
+  width: 0;
+  height: 0;
+  border-right: 4px solid transparent;
+  border-bottom: 18px solid #ffd36a;
+  border-left: 4px solid transparent;
+  filter: drop-shadow(0 0 4px rgb(255 211 106 / 55%));
+}
+.south-tail { top: 21px; width: 1px; height: 17px; background: rgb(206 231 243 / 40%); }
+.east-west-axis { top: 20px; width: 34px; height: 1px; background: rgb(206 231 243 / 28%); }
+.scene-compass > b {
+  position: absolute;
+  z-index: 2;
+  color: rgb(222 239 248 / 68%);
+  font-size: 8px;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
+.scene-compass > b.north { color: #ffd36a; font-weight: 800; }
+.scene-compass > small {
+  position: absolute;
+  left: 50%;
+  bottom: -16px;
+  color: rgb(199 224 237 / 48%);
+  font-size: 8px;
+  letter-spacing: .12em;
+  transform: translateX(-50%);
+}
 .factor-nav {
   position: absolute;
   z-index: 6;
@@ -935,6 +1039,7 @@ onUnmounted(() => {
   .scene-label span { display: none; }
   .scene-label { grid-template-columns: 7px auto; }
   .lake-label { left: 66%; }
+  .scene-compass { left: 12px; bottom: 98px; transform: scale(.88); transform-origin: left bottom; }
 }
 
 @media (prefers-reduced-motion: reduce) {

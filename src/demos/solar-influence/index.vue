@@ -18,7 +18,7 @@ const flare = ref<'spot' | 'flare'>('flare')
     </template>
 
     <g v-if="stepId === 'radiation'">
-      <image href="/textures/sun-realistic.png" x="72" y="172" width="156" height="156" />
+      <image href="/textures/sun-realistic.webp" x="72" y="172" width="156" height="156" />
       <text x="150" y="254" text-anchor="middle" class="lb">太阳</text>
       <EarthDisc :cx="620" :cy="270" :r="150" clip-id="sol-earth" />
       <path d="M470,270 H770" :stroke="DemoHex.earthEquator" stroke-width="1.5" fill="none" />
@@ -38,7 +38,7 @@ const flare = ref<'spot' | 'flare'>('flare')
     </g>
 
     <g v-else>
-      <image href="/textures/sun-realistic.png" x="112" y="152" width="196" height="196" />
+      <image href="/textures/sun-realistic.webp" x="112" y="152" width="196" height="196" />
       <circle v-if="flare === 'spot'" cx="180" cy="230" r="14" fill="#3a2410" />
       <circle v-if="flare === 'spot'" cx="230" cy="270" r="10" fill="#3a2410" />
       <circle v-else cx="268" cy="210" r="22" :fill="DemoHex.warm" opacity="0.9" />

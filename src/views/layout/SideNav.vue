@@ -13,6 +13,15 @@ const router = useRouter()
 const activeGradeId = ref<string | null>(curriculum.grades[0]?.id ?? null)
 const openBooks = ref<string[]>([])
 const collapsed = ref(false)
+let collapsedBeforeLeaderboard = false
+watch(() => route.name, (name, previous) => {
+  if (name === 'leaderboard') {
+    collapsedBeforeLeaderboard = collapsed.value
+    collapsed.value = true
+  } else if (previous === 'leaderboard') {
+    collapsed.value = collapsedBeforeLeaderboard
+  }
+}, { immediate: true })
 
 const activeGrade = computed(() => {
   const id = activeGradeId.value

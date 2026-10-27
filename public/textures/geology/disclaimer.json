@@ -1,0 +1,11 @@
+{
+  "source": "OpenAI built-in image_gen; illustrations generated for this project",
+  "license": "AI-generated project assets; no third-party photograph or map is represented",
+  "files": ["volcano-cutaway.jpg", "landform-cutaway.jpg", "wind-cutaway.png"],
+  "disclaimer": "教学示意插画，不对应特定真实地点，不作为测绘、岩石鉴定或地质灾害预测依据。流动与构造变形的时间、空间尺度经过压缩；未进行流体或地质力学数值求解。",
+  "prompts": {
+    "volcano-cutaway.jpg": "Cinematic realistic volcano cross-section, underground magma chamber connected to a conduit and summit, lava flows down the slope, exposed rock strata, navy twilight sky, no text or arrows. Original full prompt: public/previews/magma/README.md.",
+    "landform-cutaway.jpg": "Premium realistic geological landscape cutaway: mountain and glacier at left, alluvial fan, meandering river across a green plain, delta and blue sea at right. Exposed folded sedimentary strata, fault and deep magma intrusion. Navy twilight, photoreal rock textures, no text or arrows.",
+    "wind-cutaway.png": "A premium photorealistic geological atlas illustration of wind erosion and deposition in an arid desert, landscape 3:2, no text or labels. Deep blue twilight sky, warm earth geology. Left: wind-eroded mushroom rock with hard sandstone cap and narrow undercut stalk. Right: golden dunes, gentle windward and steep lee slopes. Wind left to right, thin windblown sand near ground, distant mesas, shallow cutaway of bedded sand deposits. Detailed sandstone textures and dune ripples; no people, water or buildings."
+  }
+}

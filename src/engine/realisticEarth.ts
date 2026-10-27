@@ -1,5 +1,17 @@
 import * as THREE from 'three'
 
+/** 所有地球共用的地表晨霞：暗红薄雾向暖橙柔和过渡。 */
+export const earthTwilightGLSL = `
+  vec3 earthTwilight(float sunlight) {
+    float haze = exp(-pow((sunlight + 0.013) / 0.025, 2.0));
+    float amber = exp(-pow((sunlight - 0.003) / 0.016, 2.0));
+    float paleGold = exp(-pow((sunlight - 0.018) / 0.013, 2.0));
+    return vec3(0.015, 0.002, 0.003) * haze
+      + vec3(0.018, 0.008, 0.002) * amber
+      + vec3(0.008, 0.007, 0.003) * paleGold;
+  }
+`
+
 export type RealisticEarthOptions = {
   segments?: number
   atmosphereScale?: number
@@ -35,10 +47,13 @@ const surfaceFragmentShader = `
   uniform vec3 sunDirection;
   uniform float nightIntensity;
   uniform float globalOpacity;
+  uniform float twilightFocus;
   varying vec2 vUv;
   varying vec3 vLocalNormal;
   varying vec3 vViewNormal;
   varying vec3 vViewPosition;
+
+  ${earthTwilightGLSL}
 
   void main() {
     vec3 dayColor = texture2D(dayMap, vUv).rgb;
@@ -51,8 +66,9 @@ const surfaceFragmentShader = `
     color += dayColor * 0.028 * (1.0 - dayMix);
     color += nightColor * nightIntensity * (1.0 - dayMix);
 
-    float twilight = (1.0 - smoothstep(0.0, 0.10, abs(sunlight))) * 0.12;
-    color += vec3(0.22, 0.055, 0.018) * twilight;
+    float morning = dot(vLocalNormal, cross(normalize(sunDirection), vec3(0.0, 1.0, 0.0)));
+    float focus = abs(twilightFocus) < 0.5 ? 1.0 : mix(0.25, 1.0, smoothstep(-0.03, 0.03, morning * twilightFocus));
+    color += earthTwilight(sunlight) * focus;
 
     vec3 viewDir = normalize(vViewPosition);
     float rim = pow(1.0 - max(dot(normalize(vViewNormal), viewDir), 0.0), 3.2);
@@ -121,6 +137,7 @@ export function createRealisticEarth(
       sunDirection: { value: direction.clone() },
       nightIntensity: { value: options.nightIntensity ?? 1.35 },
       globalOpacity: { value: 1 },
+      twilightFocus: { value: 0 },
     },
     vertexShader: surfaceVertexShader,
     fragmentShader: surfaceFragmentShader,
@@ -155,6 +172,8 @@ export function createRealisticEarth(
   )
   atmosphere.name = 'realistic-earth-atmosphere'
   atmosphere.renderOrder = 3
+  // 教学球体保留地表与昼夜光照，不显示额外的透明大气壳。
+  atmosphere.visible = false
 
   return {
     surface,

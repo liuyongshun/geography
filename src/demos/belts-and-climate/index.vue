@@ -232,14 +232,14 @@ function drawControl() {
       .attr('x2', MAP.x + MAP.w)
       .attr('y1', y)
       .attr('y2', y)
-      .attr('stroke', lat === 0 ? DemoHex.lift : 'rgba(200,220,240,0.28)')
+      .attr('stroke', lat === 0 ? DemoHex.earthEquator : 'rgba(200,220,240,0.28)')
       .attr('stroke-width', lat === 0 ? 1.4 : 1)
-      .attr('stroke-dasharray', lat === 0 ? '5 4' : '2 6')
+      .attr('stroke-dasharray', null)
     svg
       .append('text')
       .attr('x', MAP.x + 6)
       .attr('y', y - 4)
-      .attr('fill', lat === 0 ? DemoHex.lift : DemoHex.inkDim)
+      .attr('fill', lat === 0 ? DemoHex.earthEquator : DemoHex.inkDim)
       .attr('font-size', 10)
       .text(lat === 0 ? '赤道' : `${lat}°N`)
   }

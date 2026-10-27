@@ -31,6 +31,19 @@ const fpCanvasRef = ref<HTMLCanvasElement | null>(null)
 const sphereCanvasRef = ref<HTMLCanvasElement | null>(null)
 
 const playing = ref(true)
+let scenePress: { x: number; y: number } | null = null
+
+function onScenePointerDown(event: PointerEvent) {
+  if (event.button === 0) scenePress = { x: event.clientX, y: event.clientY }
+}
+
+function onScenePointerUp(event: PointerEvent) {
+  if (!scenePress || event.button !== 0) return
+  const moved = Math.hypot(event.clientX - scenePress.x, event.clientY - scenePress.y)
+  scenePress = null
+  // 留出拖动视角的容差，避免拖动结束时误切换播放状态。
+  if (moved < 6) playing.value = !playing.value
+}
 const hour = ref(6)
 const coriolisOn = ref(true)
 const fpPlaying = ref(true)
@@ -99,6 +112,26 @@ const DN_CAM_VIEWS: { id: DnCamView; label: string }[] = [
 const tzCityA = ref('beijing')
 const tzCityB = ref('london')
 const tzUtcHour = ref(4) // 使北京约正午示意可调
+const timezoneGuides = ref({ equator: true, prime: true, date: true })
+const timezoneGuideOptions = [
+  { id: 'equator', label: '赤道' },
+  { id: 'prime', label: '本初子午线' },
+  { id: 'date', label: '日界线' },
+] as const
+
+function timezoneGuide<T extends THREE.Object3D>(object: T, guide: keyof typeof timezoneGuides.value): T {
+  object.userData.timezoneGuide = guide
+  object.visible = timezoneGuides.value[guide]
+  return object
+}
+
+watch(timezoneGuides, (guides) => {
+  if (threeMode !== 'timezones') return
+  globeRoot?.traverse((object) => {
+    const guide = object.userData.timezoneGuide as keyof typeof guides | undefined
+    if (guide) object.visible = guides[guide]
+  })
+}, { deep: true })
 
 const CITIES = [
   { id: 'beijing', name: '北京', lat: 39.9, lon: 116.4, zone: 8 },
@@ -258,10 +291,6 @@ let dateAnim: { from: number; to: number; t0: number } | null = null
 /** 船位：158°E 在日界线西侧（东十二区） */
 const dateShipLon = ref(158)
 const TZ_EARTH_R = 100
-let terminatorRing: THREE.Mesh | null = null
-let terminatorGlow: THREE.Mesh | null = null
-let dawnHighlight: THREE.Mesh | null = null
-let duskHighlight: THREE.Mesh | null = null
 let dayHemLabel: THREE.Sprite | null = null
 let nightHemLabel: THREE.Sprite | null = null
 /** 黄赤交角；公转平面 = XZ（Y 向上），地轴倾向 +X（夏至：地球在 -X 时北极向日） */
@@ -342,6 +371,7 @@ function disposeObj(obj: THREE.Object3D) {
 }
 
 function teardownThree() {
+  dnCameraTracking = false
   disposed = true
   cancelAnimationFrame(raf)
   controls?.dispose()
@@ -358,10 +388,6 @@ function teardownThree() {
   sunPoint = null
   sunMesh = null
   sunLookAt = null
-  terminatorRing = null
-  terminatorGlow = null
-  dawnHighlight = null
-  duskHighlight = null
   dayHemLabel = null
   nightHemLabel = null
   spinArrowMesh = null
@@ -586,8 +612,8 @@ function addEarthAxisEquator(group: THREE.Group, R: number) {
   )
 
   // 次要经纬网（每 30°，淡）
-  for (let lon = -150; lon <= 180; lon += 30) {
-    if (lon === 0 || Math.abs(lon) === 180) continue
+  // 一个经线大圆已包含两条相对经线，只画半周的角度，避免重复加深。
+  for (let lon = 30; lon < 180; lon += 30) {
     group.add(addDisposable(makeEarthMeridian(lon, R, EarthLineWidth.grid, Demo3.earthGrid, 0.35)))
   }
   for (const lat of [-60, -30, 30, 60]) {
@@ -1260,79 +1286,7 @@ function setupDayNight() {
   termRoot = new THREE.Group()
   scene.add(termRoot)
 
-  // 夜半球罩：本地 -X（背日）半壳；Three 球 phi=0 在 -X，取 [-π/2, π/2] 即 x≤0
-  termRoot.add(
-    addDisposable(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(R + 0.4, 56, 40, -Math.PI / 2, Math.PI),
-        new THREE.MeshBasicMaterial({
-          color: 0x02060f,
-          transparent: true,
-          opacity: 0.08,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      ),
-    ),
-  )
-  // 分割面：过球心、垂直日地连线
-  {
-    const divide = new THREE.Mesh(
-      new THREE.CircleGeometry(R + 0.15, 72),
-      new THREE.MeshBasicMaterial({
-        color: Demo3.earthTerminatorSoft,
-        transparent: true,
-        opacity: 0.22,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      }),
-    )
-    divide.rotation.y = Math.PI / 2
-    termRoot.add(addDisposable(divide))
-    const divideEdge = new THREE.Mesh(
-      new THREE.RingGeometry(R - 0.2, R + 0.35, 72),
-      new THREE.MeshBasicMaterial({
-        color: Demo3.earthTerminator,
-        transparent: true,
-        opacity: 0.55,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      }),
-    )
-    divideEdge.rotation.y = Math.PI / 2
-    termRoot.add(addDisposable(divideEdge))
-  }
-
-  terminatorGlow = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 0.45, EarthLineWidth.soft * 0.25, 10, 96),
-    tubeMat(Demo3.earthTerminatorSoft, 0.18),
-  )
-  terminatorGlow.rotation.y = Math.PI / 2
-  termRoot.add(addDisposable(terminatorGlow))
-
-  terminatorRing = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 0.4, EarthLineWidth.hair * 0.75, 8, 128),
-    tubeMat(Demo3.earthTerminator, 0.7),
-  )
-  terminatorRing.rotation.y = Math.PI / 2
-  termRoot.add(addDisposable(terminatorRing))
-
-  // 晨 / 昏两段异色弧：保留辨识度，避免粗环遮住地球贴图。
-  dawnHighlight = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 0.85, EarthLineWidth.hair, 8, 96, Math.PI),
-    tubeMat(Demo3.earthDawn, 0.9),
-  )
-  dawnHighlight.rotation.y = Math.PI / 2
-  dawnHighlight.rotation.z = Math.PI / 2
-  termRoot.add(addDisposable(dawnHighlight))
-
-  duskHighlight = new THREE.Mesh(
-    new THREE.TorusGeometry(R + 0.85, EarthLineWidth.hair, 8, 96, Math.PI),
-    tubeMat(Demo3.earthDusk, 0.9),
-  )
-  duskHighlight.rotation.y = Math.PI / 2
-  duskHighlight.rotation.z = -Math.PI / 2
-  termRoot.add(addDisposable(duskHighlight))
+  // 晨昏过渡统一由共享地表着色器呈现，不叠加硬质分界圆环。
 
   dayHemLabel = makeLabelSprite('昼', R * 0.9, 6, 0, { scale: 0.55, bg: false, color: DemoHex.earthDayLabel })
   nightHemLabel = makeLabelSprite('夜', -R * 0.9, 6, 0, { scale: 0.55, bg: false, color: DemoHex.earthNightLabel })
@@ -1379,18 +1333,7 @@ function setupDayNight() {
 
 function syncTerminatorFocus() {
   const f = terminatorFocus.value
-  if (dawnHighlight) {
-    dawnHighlight.visible = f === 'both' || f === 'dawn'
-    ;(dawnHighlight.material as THREE.MeshBasicMaterial).opacity = f === 'dusk' ? 0.25 : 1
-  }
-  if (duskHighlight) {
-    duskHighlight.visible = f === 'both' || f === 'dusk'
-    ;(duskHighlight.material as THREE.MeshBasicMaterial).opacity = f === 'dawn' ? 0.25 : 1
-  }
-  const coreOp = f === 'both' ? 0.7 : 0.35
-  const glowOp = f === 'both' ? 0.28 : 0.12
-  if (terminatorRing) (terminatorRing.material as THREE.MeshBasicMaterial).opacity = coreOp
-  if (terminatorGlow) (terminatorGlow.material as THREE.MeshBasicMaterial).opacity = glowOp
+  if (activeEarth) activeEarth.surface.material.uniforms.twilightFocus!.value = f === 'both' ? 0 : f === 'dawn' ? 1 : -1
 }
 
 /**
@@ -1420,6 +1363,14 @@ function syncDayNightScene() {
     0,
     Math.sin(dnOrbitAngle.value) * DN_ORBIT_R,
   )
+  // 全景适度跟随，让地球保持可见，同时保留相对太阳的公转位移。
+  if (dnCameraTracking && camera && controls) {
+    const shift = earthOrbitRoot.position.clone().sub(dnCameraAnchor)
+      .multiplyScalar(dnCamView.value === 'overview' ? DN_OVERVIEW_FOLLOW : 1)
+    camera.position.add(shift)
+    controls.target.add(shift)
+    dnCameraAnchor.copy(earthOrbitRoot.position)
+  }
 
   earthSpinRoot.rotation.y = spinFacingSun(localHour.value)
 
@@ -1445,8 +1396,11 @@ const _dnCamSide = new THREE.Vector3()
 const _dnCamPos = new THREE.Vector3()
 const _dnCamTarget = new THREE.Vector3()
 const _dnCamUp = new THREE.Vector3(0, 1, 0)
+const dnCameraAnchor = new THREE.Vector3()
+const DN_OVERVIEW_FOLLOW = 0.82
+let dnCameraTracking = false
 
-/** 预设镜头：只点选瞬间跳一次，不每帧跟随（否则公转看起来像停住） */
+/** 以地球为主取景，太阳与轨道作为公转参照。 */
 function applyDayNightView(kind: DnCamView = dnCamView.value) {
   if (!camera || !controls || !earthOrbitRoot) return
   dnCamView.value = kind
@@ -1459,16 +1413,16 @@ function applyDayNightView(kind: DnCamView = dnCamView.value) {
   if (_dnCamSide.lengthSq() < 1e-8) _dnCamSide.set(1, 0, 0)
   else _dnCamSide.normalize()
   camera.up.copy(_dnCamUp)
+  const halfFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.min(1, camera.aspect))
 
   if (kind === 'overview') {
-    _dnCamTarget.copy(ep).multiplyScalar(0.42)
-    _dnCamPos
-      .copy(_dnCamTarget)
-      .addScaledVector(_dnCamSide, orbitR * 0.92)
-      .addScaledVector(_dnCamUp, orbitR * 0.48)
+    _dnCamTarget.copy(ep).multiplyScalar(DN_OVERVIEW_FOLLOW)
+    const distance = (R + orbitR * (1 - DN_OVERVIEW_FOLLOW) + 18) / Math.sin(halfFov) * 0.95
+    _dnCamPos.set(0, 0.45, 1).normalize().multiplyScalar(distance).add(_dnCamTarget)
   } else if (kind === 'edge') {
     _dnCamTarget.copy(ep)
-    _dnCamPos.copy(ep).addScaledVector(_dnCamSide, R * 4.6).addScaledVector(_dnCamUp, R * 0.55)
+    const distance = (R + 30) / Math.sin(halfFov) * 1.08
+    _dnCamPos.copy(ep).addScaledVector(_dnCamSide, distance).addScaledVector(_dnCamUp, R * 0.3)
   } else if (kind === 'day') {
     _dnCamTarget.copy(ep)
     const fromSun = Math.max(DN_SUN_R * 1.85, orbitR - R * 3.8)
@@ -1483,6 +1437,8 @@ function applyDayNightView(kind: DnCamView = dnCamView.value) {
 
   camera.position.copy(_dnCamPos)
   controls.target.copy(_dnCamTarget)
+  dnCameraAnchor.copy(ep)
+  dnCameraTracking = true
   controls.update()
 }
 
@@ -1536,7 +1492,7 @@ function loopThree() {
     }
     controls?.update()
   } else if (threeMode === 'sphere') {
-    updateSphereArrows(dt)
+    if (playing.value) updateSphereArrows(dt)
     controls?.update()
   } else if (threeMode === 'timezones') {
     if (dateAnim && globeRoot) {
@@ -2361,11 +2317,11 @@ function enterCoriolisMode(mode: CoriolisMode) {
   else requestAnimationFrame(() => setupSphereThrow())
 }
 
-function equatorArc(lon0: number, lon1: number, r: number) {
+function navigationArc(lon0: number, lon1: number, r: number, lat: number) {
   const pts: THREE.Vector3[] = []
   const steps = Math.max(2, Math.ceil(Math.abs(lon1 - lon0) / 3))
   for (let i = 0; i <= steps; i++) {
-    pts.push(latLonToVec(0, lon0 + ((lon1 - lon0) * i) / steps, r))
+    pts.push(latLonToVec(lat, lon0 + ((lon1 - lon0) * i) / steps, r))
   }
   return pts
 }
@@ -2385,34 +2341,41 @@ function setDateTrail(mesh: THREE.Mesh | null) {
   }
 }
 
-/** 赤道上的过线船：航迹 + 实心箭头，方向即东/西 */
+/** 贴着球面的轻量航行标：短尾迹、空心起点和扁平箭头。 */
 function syncDateShip() {
   if (!dateShipGroup || !dateShipMesh || !dateArrow) return
   const R = TZ_EARTH_R + 2.2
+  const navigationLat = -6
   const lon = dateShipLon.value
   const movingEast = dateAnim ? dateAnim.to > dateAnim.from : shipSide(lon) !== 'east'
   const dir = movingEast ? 1 : -1
-  dateShipMesh.position.copy(latLonToVec(0, lon, R))
-  const tail = dateAnim ? dateAnim.from : lon
-  let head = dateAnim ? lon : 180
-  if (Math.abs(head - tail) < 4) head = tail + dir * 8
-  const pts = equatorArc(tail, head, R)
+  const traveled = dateAnim ? Math.min(12, Math.max(0.08, Math.abs(lon - dateAnim.from))) : 8
+  const tail = lon - dir * traveled
+  const head = lon
+  const origin = latLonToVec(navigationLat, tail, R)
+  dateShipMesh.position.copy(origin)
+  dateShipMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), origin.clone().normalize())
+  const pts = navigationArc(tail, head, R, navigationLat)
   const curve = new THREE.CatmullRomCurve3(pts)
   setDateTrail(
     new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.max(8, pts.length * 2), EarthLineWidth.mid, 6, false),
-      new THREE.MeshBasicMaterial({ color: Demo3.earthSpin }),
+      new THREE.TubeGeometry(curve, Math.max(12, pts.length * 3), 0.16, 8, false),
+      new THREE.MeshBasicMaterial({ color: Demo3.earthSpin, transparent: true, opacity: 0.7, depthWrite: false }),
     ),
   )
   const tip = pts[pts.length - 1]!
-  const prev = pts[Math.max(0, pts.length - 2)]!
-  orientArrow(dateArrow, prev, tip)
+  const angle = THREE.MathUtils.degToRad(lon)
+  const tangent = new THREE.Vector3(-Math.sin(angle), 0, -Math.cos(angle)).multiplyScalar(dir)
+  const radial = tip.clone().normalize()
+  const across = new THREE.Vector3().crossVectors(tangent, radial).normalize()
+  dateArrow.position.copy(tip)
+  dateArrow.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, tangent, radial))
 }
 
 function frameLon(lon: number, lat = 12) {
   if (!camera || !controls || !globeRoot) return
   globeRoot.rotation.y = 0
-  camera.position.copy(latLonToVec(lat, lon, TZ_EARTH_R * 2.55))
+  camera.position.copy(latLonToVec(lat, lon, timezoneCameraDistance()))
   camera.up.set(0, 1, 0)
   controls.target.set(0, 0, 0)
   controls.update()
@@ -2440,7 +2403,7 @@ function makeDateMeridian(lon: number, R: number) {
   for (let lat = -88; lat <= 88; lat += 4) pts.push(latLonToVec(lat, lon, R))
   const curve = new THREE.CatmullRomCurve3(pts)
   const mesh = new THREE.Mesh(
-    new THREE.TubeGeometry(curve, 64, EarthLineWidth.bold, 6, false),
+    new THREE.TubeGeometry(curve, 96, EarthLineWidth.bold * 0.65, 6, false),
     new THREE.MeshBasicMaterial({ color: Demo3.earthDate }),
   )
   mesh.renderOrder = 2
@@ -2449,7 +2412,7 @@ function makeDateMeridian(lon: number, R: number) {
 
 function buildDateLine(R: number) {
   if (!globeRoot) return
-  globeRoot.add(addDisposable(makeDateMeridian(180, R + 1.6)))
+  globeRoot.add(addDisposable(timezoneGuide(makeDateMeridian(180, R + 1.6), 'date')))
   const notes: { lon: number; lat: number; text: string }[] = [
     { lon: 180, lat: 40, text: '日界线' },
     { lon: 158, lat: 28, text: '东十二区' },
@@ -2457,22 +2420,26 @@ function buildDateLine(R: number) {
   ]
   for (const n of notes) {
     const p = latLonToVec(n.lat, n.lon, R + 8)
-    globeRoot.add(
-      addDisposable(
-        makeLabelSprite(n.text, p.x, p.y, p.z, { scale: 0.42, bg: true, color: DemoHex.earthDate }),
-      ),
-    )
+    const label = makeLabelSprite(n.text, p.x, p.y, p.z, { scale: 0.42, bg: true, color: DemoHex.earthDate })
+    if (n.text === '日界线') timezoneGuide(label, 'date')
+    globeRoot.add(addDisposable(label))
   }
 
   dateShipGroup = new THREE.Group()
   globeRoot.add(dateShipGroup)
   dateShipMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(2.3, 16, 12),
-    new THREE.MeshBasicMaterial({ color: Demo3.earthMarker }),
+    new THREE.RingGeometry(0.55, 0.76, 48),
+    new THREE.MeshBasicMaterial({ color: Demo3.earthSpin, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false }),
   )
+  const navigationShape = new THREE.Shape()
+  navigationShape.moveTo(0, 2.2)
+  navigationShape.lineTo(-0.95, -1.3)
+  navigationShape.lineTo(0, -0.65)
+  navigationShape.lineTo(0.95, -1.3)
+  navigationShape.closePath()
   dateArrow = new THREE.Mesh(
-    new THREE.ConeGeometry(EarthLineWidth.bold * 3.4, EarthLineWidth.bold * 9, 10),
-    new THREE.MeshBasicMaterial({ color: Demo3.earthSpin }),
+    new THREE.ShapeGeometry(navigationShape),
+    new THREE.MeshBasicMaterial({ color: Demo3.earthSpin, side: THREE.DoubleSide }),
   )
   dateShipGroup.add(addDisposable(dateShipMesh))
   dateShipGroup.add(addDisposable(dateArrow))
@@ -2507,10 +2474,10 @@ function setupTimezones() {
   if (timeEarth) timeEarth.atmosphere.visible = false
 
   // 赤道 + 本初子午（主框架）
-  globeRoot.add(addDisposable(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.85)))
-  globeRoot.add(addDisposable(makeEarthMeridian(0, R, EarthLineWidth.gridMajor, Demo3.earthPrime, 0.85)))
+  globeRoot.add(addDisposable(timezoneGuide(makeEarthParallel(0, R, EarthLineWidth.gridMajor, Demo3.earthEquator, 0.85), 'equator')))
+  globeRoot.add(addDisposable(timezoneGuide(makeEarthMeridian(0, R, EarthLineWidth.gridMajor, Demo3.earthPrime, 0.85), 'prime')))
   globeRoot.add(
-    addDisposable(makeLabelSprite('赤道', R * 0.55, 6, R * 0.75, { scale: 0.4, bg: false, color: DemoHex.earthEquator })),
+    addDisposable(timezoneGuide(makeLabelSprite('赤道', R * 0.55, 6, R * 0.75, { scale: 0.4, bg: false, color: DemoHex.earthEquator }), 'equator')),
   )
 
   // 时区边界：中心经线 offset×15 的西界 = offset×15 − 7.5
@@ -2521,18 +2488,25 @@ function setupTimezones() {
     const westLng = centerLng - 7.5
     const isCn = offset === 8 || offset === 9
     const isZero = offset === 0 || offset === 1
-    const color = isCn ? 0xffd060 : isZero ? 0x6ec8f0 : 0xf0a020
+    const color = isCn ? 0xffd060 : isZero ? 0x6ec8f0 : Demo3.earthGrid
     const tube = isCn ? highlightedTimezoneLineRadius : timezoneLineRadius
-    const op = isCn ? 0.78 : 0.48
-    globeRoot.add(addDisposable(makeEarthMeridian(westLng, R, tube, color, op)))
+    const op = isCn || isZero ? 0.78 : 0.32
+    // 时区边界只绘制当前经度的半圆，避免完整大圆把相对经线重复画亮。
+    const boundaryPoints: THREE.Vector3[] = []
+    for (let lat = -89; lat <= 89; lat += 2) boundaryPoints.push(latLonToVec(lat, westLng, R + 0.35))
+    globeRoot.add(addDisposable(new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(boundaryPoints), 128, tube, 6, false),
+      tubeMat(color, op),
+    )))
 
     const label = offset === 0 ? 'UTC±0' : offset > 0 ? `UTC+${offset}` : `UTC${offset}`
     const lp = latLonToVec(-16, centerLng, R + 6)
     const spr = makeLabelSprite(label, lp.x, lp.y, lp.z, {
-      scale: offset === 0 || offset === 8 ? 0.48 : 0.32,
+      scale: offset === 0 || offset === 8 ? 0.48 : 0.28,
       bg: offset === 0 || offset === 8,
-      color: offset === 0 ? '#6ec8f0' : offset === 8 ? '#ffe08a' : '#f0c878',
+      color: offset === 0 ? '#6ec8f0' : offset === 8 ? '#ffe08a' : DemoHex.inkMuted,
     })
+    ;(spr.material as THREE.SpriteMaterial).opacity = offset === 0 || offset === 8 ? 1 : 0.65
     globeRoot.add(addDisposable(spr))
   }
 
@@ -2540,17 +2514,17 @@ function setupTimezones() {
   {
     const notes: { lon: number; text: string; color: string; lat: number }[] = [
       { lon: -7.5, text: '中时区西界', color: '#6ec8f0', lat: 28 },
-      { lon: 7.5, text: '中时区东界', color: '#6ec8f0', lat: 28 },
+      { lon: 7.5, text: '中时区东界', color: '#6ec8f0', lat: 18 },
       { lon: 0, text: '本初子午', color: DemoHex.earthPrime, lat: 48 },
       { lon: 112.5, text: '东八区西界', color: '#ffe08a', lat: 28 },
-      { lon: 127.5, text: '东八区东界', color: '#ffe08a', lat: 28 },
+      { lon: 127.5, text: '东八区东界', color: '#ffe08a', lat: 18 },
     ]
     for (const n of notes) {
       const p = latLonToVec(n.lat, n.lon, R + 8)
+      const label = makeLabelSprite(n.text, p.x, p.y, p.z, { scale: 0.4, bg: true, color: n.color })
+      if (n.lon === 0) timezoneGuide(label, 'prime')
       globeRoot.add(
-        addDisposable(
-          makeLabelSprite(n.text, p.x, p.y, p.z, { scale: 0.4, bg: true, color: n.color }),
-        ),
+        addDisposable(label),
       )
     }
   }
@@ -2576,9 +2550,15 @@ function syncTimezoneSun() {
 }
 
 /** 镜头看向东八区（北京附近），保证首屏能看到地图与时区线 */
+function timezoneCameraDistance() {
+  const halfFov = THREE.MathUtils.degToRad((camera?.fov ?? 42) / 2)
+  const limitingAngle = Math.atan(Math.tan(halfFov) * Math.min(1, camera?.aspect ?? 1))
+  return TZ_EARTH_R / Math.sin(limitingAngle) * 1.24
+}
+
 function frameTimezoneCamera() {
   if (!camera || !controls) return
-  const focus = latLonToVec(25, 110, TZ_EARTH_R * 2.8)
+  const focus = latLonToVec(25, 110, timezoneCameraDistance())
   camera.position.copy(focus)
   camera.up.set(0, 1, 0)
   controls.target.set(0, 0, 0)
@@ -2604,7 +2584,7 @@ function syncTimezoneMarkers() {
     seen.add(item.city.id)
     const p = latLonToVec(item.city.lat, item.city.lon, R + 1.6)
     const dot = new THREE.Mesh(
-      new THREE.SphereGeometry(2.2, 14, 12),
+      new THREE.SphereGeometry(1.5, 20, 16),
       new THREE.MeshBasicMaterial({ color: item.color }),
     )
     dot.position.copy(p)
@@ -2745,10 +2725,7 @@ onUnmounted(() => {
             <option value="60" />
             <option value="90" />
           </datalist>
-          <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-            {{ playing ? '暂停自转' : '继续自转' }}
-          </button>
-          <span class="note">{{ poleSpinLabel }} · N逆S顺</span>
+          <span class="note">{{ poleSpinLabel }} · N逆S顺 · 点击球体暂停 / 恢复</span>
         </template>
 
         <template v-else-if="isBasicsPeriod">
@@ -2769,10 +2746,8 @@ onUnmounted(() => {
             />
             <em>{{ periodHours.toFixed(1) }}h</em>
           </label>
-          <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-            {{ playing ? '暂停' : '播放' }}
-          </button>
           <button type="button" class="btn" @click="restartPeriod">重放</button>
+          <span class="note">点击球体暂停 / 恢复</span>
         </template>
       </template>
 
@@ -2793,9 +2768,7 @@ onUnmounted(() => {
           <button type="button" :class="{ on: terminatorFocus === 'dawn' }" @click="terminatorFocus = 'dawn'">晨线</button>
           <button type="button" :class="{ on: terminatorFocus === 'dusk' }" @click="terminatorFocus = 'dusk'">昏线</button>
         </div>
-        <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-          {{ playing ? '暂停' : '播放自转+公转' }}
-        </button>
+        <span class="note">点击球体暂停 / 恢复</span>
         <div class="mode-tabs">
           <button
             v-for="v in DN_CAM_VIEWS"
@@ -2827,7 +2800,7 @@ onUnmounted(() => {
         <button type="button" class="btn" @click="restartThrow">重放</button>
         <span v-if="coriolisMode === 'top'" class="note">点圆盘重放 · 北右南左 · 赤道不偏</span>
         <span v-else-if="coriolisMode === 'fp'" class="note">左北右南 · 朝极地扔出 · 应用：北半球右岸冲刷更强</span>
-        <span v-else class="note">南北半球同时示意 · 拖动旋转</span>
+        <span v-else class="note">南北半球同时示意 · 点击球体暂停 / 恢复 · 拖动旋转</span>
       </template>
 
       <template v-else-if="isTimezones">
@@ -2836,8 +2809,9 @@ onUnmounted(() => {
           <input v-model.number="tzUtcHour" type="range" min="0" max="23.9" step="0.1" />
           <em>{{ formatClock(tzUtcHour) }}</em>
         </label>
+        <div class="city-comparison">
         <div class="cities">
-          <span class="note">城 A</span>
+          <span class="note">对比城市 1</span>
           <button
             v-for="c in CITIES"
             :key="'a-' + c.id"
@@ -2850,7 +2824,7 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="cities">
-          <span class="note">城 B</span>
+          <span class="note">对比城市 2</span>
           <button
             v-for="c in CITIES"
             :key="'b-' + c.id"
@@ -2862,18 +2836,20 @@ onUnmounted(() => {
             {{ c.name }}
           </button>
         </div>
-        <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-          {{ playing ? '暂停自转' : '慢速自转' }}
-        </button>
+        </div>
         <button type="button" class="btn" @click="lookAtDateLine">看日界线</button>
         <button type="button" class="btn" @click="crossDateLine('east')">向东过线</button>
         <button type="button" class="btn" @click="crossDateLine('west')">向西过线</button>
-        <span class="note">品红竖线=日界线 · 青箭头=过线 · 东加西减</span>
+        <label v-for="guide in timezoneGuideOptions" :key="guide.id" class="ctrl check">
+          <input v-model="timezoneGuides[guide.id]" type="checkbox" />
+          {{ guide.label }}
+        </label>
+        <span class="note">品红竖线=日界线 · 青箭头=过线 · 东加西减 · 点击球体暂停 / 恢复</span>
       </template>
     </div>
 
     <div v-if="isBasics" class="stage">
-      <canvas ref="canvasRef" class="globe" />
+      <canvas ref="canvasRef" class="globe" @pointerdown="onScenePointerDown" @pointerup="onScenePointerUp" />
       <aside v-if="isBasicsDirection" class="hud hud-wide">
         <p class="hud-title">{{ poleSpinLabel }}</p>
         <p class="hud-row"><span>角速度</span><strong>{{ speedInfo.angular === 0 ? '0（极点）' : '≈15°/h' }}</strong></p>
@@ -2905,7 +2881,7 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="isDayNight" class="stage">
-      <canvas ref="canvasRef" class="globe" />
+      <canvas ref="canvasRef" class="globe" @pointerdown="onScenePointerDown" @pointerup="onScenePointerUp" />
       <aside class="hud hud-wide">
         <p class="hud-title">{{ BEIJING.name }} · {{ localLabel }}</p>
         <p class="hud-row"><span>自转</span><strong>{{ dayPhase }} · 地方时对准太阳</strong></p>
@@ -2913,12 +2889,12 @@ onUnmounted(() => {
         <p class="hud-phase">
           公转示意 {{ ORBIT_TEACH_DEG_PER_DAY }}°/日（真≈{{ ORBIT_TRUE_DEG_PER_DAY.toFixed(2) }}°）· 地轴定向不变
         </p>
-        <p class="hud-hint">可拖转/滚轮缩放/右键平移 · 太阳居中 · 晨昏⊥日地连线</p>
+        <p class="hud-hint">可拖转/滚轮缩放/右键平移 · 地球为主取景 · 晨昏⊥日地连线</p>
       </aside>
     </div>
 
     <div v-else-if="isTimezones" class="stage">
-      <canvas ref="canvasRef" class="globe" />
+      <canvas ref="canvasRef" class="globe" @pointerdown="onScenePointerDown" @pointerup="onScenePointerUp" />
       <aside class="hud hud-wide">
         <p class="hud-title">理论时区 · 每 15°</p>
         <p class="hud-row">
@@ -2951,7 +2927,13 @@ onUnmounted(() => {
       preserveAspectRatio="xMidYMid meet"
     />
     <canvas v-show="isCoriolis && coriolisMode === 'fp'" ref="fpCanvasRef" class="globe" />
-    <canvas v-show="isCoriolis && coriolisMode === 'sphere'" ref="sphereCanvasRef" class="globe" />
+    <canvas
+      v-show="isCoriolis && coriolisMode === 'sphere'"
+      ref="sphereCanvasRef"
+      class="globe"
+      @pointerdown="onScenePointerDown"
+      @pointerup="onScenePointerUp"
+    />
   </div>
 </template>
 
@@ -3023,6 +3005,17 @@ onUnmounted(() => {
   display: inline-flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+.city-comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cities {
+  align-items: center;
+}
+.cities > .note {
+  min-width: 64px;
 }
 .chip {
   border: 1px solid var(--border);

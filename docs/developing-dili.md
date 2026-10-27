@@ -36,7 +36,7 @@ Agent 与贡献者引入**新依赖、新数据、新贴图、新外部 API** �
 | 过程时间线 / 锋面剖面 / 火山成岩等微场景 | Three.js 自建场景（可 OrbitControls） |
 | 银河系棒旋示意点云 | `threejs-galaxy-shader`（MIT；嵌入现有 scene/composer，叠教学标注） |
 | 循环图式、类型卡片、地带谱等 2D 示意 | D3 / 手写 SVG |
-| 区域填色、线路、一带一路、产业转移 | MapLibre GL |
+| 区域填色、线路、一带一路、产业转移 | MapLibre GL（按需再装 `maplibre-gl`；引擎标签已预留） |
 | 温湿柱、产业结构、时间序列 | Apache ECharts |
 | 三角剖分（国界等） | earcut |
 
@@ -78,9 +78,10 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | `earth-topology.png` | 地形 bump | 教学用起伏示意 |
 | `earth-period.jpg` | 恒星日/太阳日、地转偏向、时区、公转/五带示意球 | NASA Visible Earth **land_shallow_topo_2048**（陆地浅海地形真彩），公有领域；见 `earth-period-disclaimer.json` |
 | `earth-period-disclaimer.json` | 上项声明 | 课堂示意 · 非测绘依据 |
-| `sun-hmi.jpg` | 太阳表面（日面 billboard） | NASA SDO **HMI Intensitygram Flattened** 2048px（`latest_2048_HMIIF.jpg`），公有领域；经 `sunVisual` 抠黑底（文件名历史原因仍为 sun-hmi） |
+| `sun-realistic.webp` | 太阳日面 billboard | 透明底写实日面；WebP 保留 alpha；见 `sun-disclaimer.json` |
 | `sun-disclaimer.json` | 太阳贴图声明 | 非观测预报 |
-| `space/milky-way.jpg` | 太阳系课全天银道光带 | NASA SVS **Deep Star Maps** 8K equirectangular，公有领域；叠 BSC5 亮星光晕与密星尘 |
+| `space/milky-way.jpg` | 太阳系课全天银道光带 | NASA SVS **Deep Star Maps** equirectangular（课堂打包 **4K**，源为 8K），公有领域；叠 BSC5 亮星光晕与密星尘 |
+| `geology/volcano-cutaway.jpg` / `landform-cutaway.jpg` / `wind-cutaway.png` | 岩浆、连续地貌与风蚀风积剖面课底图 | 项目内 image_gen 生成的教学插画；非特定真实地点，见 `geology/disclaimer.json` |
 | `space/milky-way-disk.jpg` | （可选）银河系俯视参考图 | NASA/JPL **PIA10748** 公有领域（`npm run build:galaxy-disk`）；课堂主视觉已改用 `threejs-galaxy-shader`｜勿用银心红外特写 |
 | `space/disclaimer.json` | 星空贴图声明 | 非导航依据；可选升级 [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) |
 | `astro/bright-stars.json` | 亮星星表（锐化+星名） | Yale **BSC5** 转换（`npm run build:stars`），公有领域目录数据 |
@@ -99,7 +100,7 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | `rocks/disclaimer.json` | 岩石贴图声明 | 标明 CC0 与「非岩性鉴定」 |
 | `weather/ground-color.jpg` | 锋面/气旋地面 | ambientCG **Ground037**，**CC0** |
 | `weather/cloud-soft.png` | 锋面云层 | 教学用软云（程序生成） |
-| `weather/cloud-realistic.png` | 大气受热过程的云层 | 写实教学云，透明底；见 `weather/disclaimer.json` |
+| `weather/cloud-realistic.webp` | 大气受热过程的云层 | 写实教学云，透明底 WebP；见 `weather/disclaimer.json` |
 | `weather/disclaimer.json` | 天气贴图声明 | 非预报依据 |
 
 | `landcover/aerial-grass.jpg` | 俯视草地 | Poly Haven **aerial_grass_rock**，**CC0** |
@@ -116,6 +117,15 @@ npm run build:galaxy     # 重建 public/astro/milky-way-arms-teach.json
 | `landcover/disclaimer.json` | 陆地水体贴图声明 | 标明 CC0、生成图与「非实测」 |
 
 岩石贴图下载站：[ambientCG](https://ambientcg.com/)（优先 1K Color，体积可控）。Poly Haven 俯视地表：[polyhaven.com/textures](https://polyhaven.com/textures)（**CC0**）。
+
+### 3.1.1 体积卫生（打包前）
+
+| 目标 | 做法 |
+|------|------|
+| 本机磁盘 | `dist/`、`.cache/`、`src-tauri/target/`、`**/__pycache__/` 已在 `.gitignore`；可随时删除，下次 `tauri dev` / `vite build` 会重建 |
+| `public/` 贴图 | 无透明通道优先 JPEG（q≈80–85）；需透明用 WebP；全景/正射课堂足够用 **4K**，勿默认打 8K |
+| 依赖 | 未在 `src` 引用的包不要留在 `dependencies`（例如曾移除未使用的 `maplibre-gl`） |
+| 草稿 | 根目录临时导出图、重复预览底图勿入库；预览页应复用课程同源贴图 |
 
 ### 3.2 本地地理数据 `public/geo/`
 
@@ -288,6 +298,16 @@ src-tauri/               桌面壳
 
 ## 9. 相关规则索引
 
+### 攀登榜数据与迁移
+
+角色资料弹窗支持编辑性格、爱好，均为选填、各最多120字。两字段随班级数据自动保存，包含在完整 JSON 备份及 Excel 导入导出中；下载的 Excel 模板与导入预览同步提供这两列。旧缓存与旧 JSON 备份缺少字段仍可读取；Excel 更新已有角色时，没有相应列则保留原值，有列且为空则清空对应字段，不勾选覆盖则保留现有资料。
+
+Windows 正式版使用 Rust `current_exe()` 确定路径，班级、积分、座右铭、线路段数、角色绑定、自定义素材保存为 exe 同级 `data/leaderboard.json`，与启动工作目录和U盘盘符无关。开发环境及其他平台使用应用本地数据目录下的 `data/leaderboard.json`；纯浏览器模式继续使用 localStorage / IndexedDB。
+
+启动时先读取并校验文件，再挂载页面；存在文件时以文件为准，读取失败停止加载，避免以示例数据覆盖原数据。文件不存在时读取当前电脑旧版本 localStorage / IndexedDB，进入攀登榜后首次保存即迁移至文件。迁移必须在保存过数据的原电脑运行新版，其他电脑无法读取原电脑缓存。
+
+写入经过串行队列，先写临时文件并同步，再保留 `leaderboard.json.bak` 并替换正式文件。失败在页面显示错误，不静默改存电脑缓存。攀登榜“数据备份”可导出完整 JSON，导入校验格式、班级、学生、角色及素材；确认覆盖前自动下载当前完整备份。Excel 导入导出仍用于名单交换。分发更新包时替换 exe，保留用户已有的 data 文件夹，禁止将用户数据打入公开分发包。
+
 | 文件 | 内容 |
 |------|------|
 | `.cursor/rules/dili-core.mdc` | 中文、争议底图、总原则 |
@@ -295,3 +315,15 @@ src-tauri/               桌面壳
 | `.cursor/rules/globe-layers.mdc` | 可插拔图层 |
 | `.cursor/rules/curriculum-bindings.mdc` | 课 ↔ 图层绑定 |
 | `.cursor/rules/docs-sync.mdc` | 本教程与资源表同步义务 |
+
+### 动态地质知识图（岩石循环 / 地表形态变化）
+
+两节通过 `src/demos/geology-shared/GeologyLesson.vue` 接入现有 DemoLab；入口为 `/demo/rock-cycle`、`/demo/landform-change`。原课步保留，第二节增加内外力综合总览。
+
+技术路线评估：岩层与过程的空间关系是知识重点，但本次需求明确围绕已确认的写实图片动效；固定剖面已能呈现所需关系，旋转视角不会增加当前任务所需信息。采用写实插画 + 局部 WebGL 流动 + 有纹理的 SVG 变形与标注，避免改成视觉质量不一致的简化模型。渲染分辨率限制为 1.5 倍设备像素比；分类与循环课步用静态背景，后台停止推进时间，切换时释放 WebGL 资源，兼顾桌面与窄屏。
+
+- 岩石形成：六阶段时间轴可播放、暂停、拖动；冷却、外力、固结、变质与重熔由 `RockFormation.vue` 显示对应过程，区分通常保持固态的变质与重熔。
+- 岩石分类与循环：纹理标本为教学示意，非鉴定依据；四类转化作用可筛选路径，箭头指向目标节点。
+- 地表形态：总览展示河流、海面与深部岩浆局部运动；褶皱/正断层用有纹理的剖面表达，参数手动调整后可衔接播放；流水、风力、冰川与海浪各有对应对象及方向箭头。
+- 全屏复用 DemoLab 的 `data-dili-canvas`，控件使用 `data-dili-chrome`；保持插画原始比例。地理过程时间与空间尺度均为教学压缩，不做物理求解。
+- 新增插画来源与提示词记录于 `public/textures/geology/disclaimer.json`，岩石纹理仍沿用既有 ambientCG 资源声明。

@@ -102,8 +102,8 @@ def build_height() -> tuple[float, float, np.ndarray]:
     if sys.byteorder != "little":
         quantized.byteswap()
     (OUT / "height-u16.bin").write_bytes(quantized.tobytes())
-    Image.fromarray(quantized_values.astype(np.uint16)).save(
-        OUT / "height-preview.png", optimize=True
+    Image.fromarray(quantized_values.astype(np.uint16)).convert("RGB").save(
+        OUT / "height-preview.jpg", quality=90, optimize=True
     )
     return minimum, maximum, values
 

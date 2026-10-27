@@ -20,6 +20,18 @@ const props = defineProps<{
 
 const canvasRef = ref<HTMLCanvasElement>()
 const playing = ref(true)
+let scenePress: { x: number; y: number } | null = null
+
+function onScenePointerDown(event: PointerEvent) {
+  if (event.button === 0) scenePress = { x: event.clientX, y: event.clientY }
+}
+
+function onScenePointerUp(event: PointerEvent) {
+  if (!scenePress || event.button !== 0) return
+  const moved = Math.hypot(event.clientX - scenePress.x, event.clientY - scenePress.y)
+  scenePress = null
+  if (moved < 6) playing.value = !playing.value
+}
 const focusBody = ref<string | 'all'>('all')
 const speed = ref(1)
 /** 亮星中文/Bayer 名标注 */
@@ -128,6 +140,7 @@ let galaxyShaderMat: THREE.ShaderMaterial | null = null
 /** 盘面星云气体（fBm） */
 let galaxyNebulaMat: THREE.ShaderMaterial | null = null
 let galaxySpin = 0
+let galaxyElapsed = 0
 let composer: EffectComposer | null = null
 let bloomPass: UnrealBloomPass | null = null
 let raf = 0
@@ -1654,11 +1667,10 @@ function loop() {
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
   syncBodies(dt)
-  if (galaxyShaderMat?.uniforms?.u_time) {
-    galaxyShaderMat.uniforms.u_time.value = now * 0.000012 * speed.value
-  }
-  if (galaxyNebulaMat?.uniforms?.uTime) {
-    galaxyNebulaMat.uniforms.uTime.value = now * 0.001 * speed.value
+  if (playing.value) {
+    galaxyElapsed += dt * speed.value
+    if (galaxyShaderMat?.uniforms?.u_time) galaxyShaderMat.uniforms.u_time.value = galaxyElapsed * 0.012
+    if (galaxyNebulaMat?.uniforms?.uTime) galaxyNebulaMat.uniforms.uTime.value = galaxyElapsed
   }
   if (!isGalaxy.value && camera && sunLookAt) sunLookAt(camera)
   controls?.update()
@@ -1729,9 +1741,7 @@ onUnmounted(() => {
   <div class="wrap">
     <div class="toolbar">
       <span class="note">{{ stepTitle }}</span>
-      <button type="button" class="btn" :class="{ on: playing }" @click="playing = !playing">
-        {{ playing ? '暂停' : '播放' }}
-      </button>
+      <span class="note">点击场景暂停 / 恢复</span>
       <template v-if="isGalaxy">
         <div class="chips">
           <button type="button" class="chip" :class="{ on: galaxyView === 'oblique' }" @click="galaxyView = 'oblique'">
@@ -1778,7 +1788,7 @@ onUnmounted(() => {
       <span class="note dim">{{ isGalaxy ? '示意 · 旋臂据开源银道模型简化' : '示意 · 距离/大小已夸张' }}</span>
     </div>
     <div class="stage">
-      <canvas ref="canvasRef" class="globe" />
+      <canvas ref="canvasRef" class="globe" @pointerdown="onScenePointerDown" @pointerup="onScenePointerUp" />
       <aside class="hud">
         <p class="hud-title">{{ stepTitle }}</p>
         <template v-if="stepId === 'galaxy'">

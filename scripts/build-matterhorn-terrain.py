@@ -106,7 +106,7 @@ def build_height() -> tuple[float, float]:
 
     preview = Image.new("I;16", sampled.size)
     preview.putdata(quantized)
-    preview.save(OUT / "height-preview.png", optimize=True)
+    preview.convert("RGB").save(OUT / "height-preview.jpg", quality=90, optimize=True)
     return minimum, maximum
 
 
